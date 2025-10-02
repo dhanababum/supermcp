@@ -1,0 +1,14 @@
+[project]
+name = "mcp-tools"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12.2"
+dependencies = [
+    "aiosqlite>=0.21.0",
+    "fastapi>=0.118.0",
+    "fastapi-mcp>=0.4.0",
+    "fastmcp>=2.12.4",
+    "mcp[cli]>=1.15.0",
+    "sqlalchemy[asyncio]>=2.0.43",
+]
