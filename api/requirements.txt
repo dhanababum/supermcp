@@ -1,0 +1,21 @@
+# FastAPI and dependencies
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+
+# Database
+sqlmodel>=0.0.14
+psycopg2-binary>=2.9.9
+
+# Migrations
+alembic>=1.16.0
+
+# CORS support
+python-multipart>=0.0.6
+
+# HTTP client for MCP communication
+requests>=2.31.0
+
+# Date parsing
+python-dateutil>=2.8.2
+

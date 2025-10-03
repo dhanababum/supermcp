@@ -216,7 +216,7 @@ Currently, the form data is just displayed in an alert. To fully integrate:
 ### 1. Create Save Endpoint
 Add to `api/main.py`:
 ```python
-@router.post("/connector-config/{connector_name}")
+@router.post("/server-config/{server_name}")
 def save_connector_config(connector_name: str, config: dict):
     # Save configuration to database
     # Return success response
@@ -226,7 +226,7 @@ def save_connector_config(connector_name: str, config: dict):
 ### 2. Update handleFormSubmit
 ```javascript
 const handleFormSubmit = ({ formData }) => {
-  fetch(`http://localhost:9000/api/connector-config/${selectedConnector.id}`, {
+  fetch(`http://localhost:9000/api/server-config/${selectedConnector.id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(formData)
