@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useConnectors } from '../../hooks';
 import { LoadingSpinner, ErrorMessage } from '../../components/common';
-import { ConnectorCard, ConfigurationModal } from './components';
+import { ConnectorCard, ConfigurationModal, AddConnectorModal } from './components';
 
 const Connectors = () => {
-  const { connectors, loading, error } = useConnectors(true);
+  const { connectors, loading, error, refetch } = useConnectors(true);
   const [selectedConnector, setSelectedConnector] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const handleConfigureConnector = (connector) => {
     setSelectedConnector(connector);
@@ -16,8 +17,20 @@ const Connectors = () => {
   };
 
   const handleSuccess = () => {
-    // Optionally refresh connectors list
+    // Refresh connectors list
+    if (refetch) {
+      refetch();
+    }
   };
+
+  const handleAddConnector = () => {
+    setShowAddModal(true);
+  };
+
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+  };
+
 
   return (
     <div>
@@ -38,7 +51,10 @@ const Connectors = () => {
           {/* Action Bar */}
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 flex items-center space-x-2">
+              <button 
+                onClick={handleAddConnector}
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -86,7 +102,10 @@ const Connectors = () => {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No connectors available</h3>
               <p className="text-gray-600 mb-4">Get started by adding your first connector</p>
-              <button className="px-6 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700">
+              <button 
+                onClick={handleAddConnector}
+                className="px-6 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700"
+              >
                 Add Your First Connector
               </button>
             </div>
@@ -102,6 +121,14 @@ const Connectors = () => {
           onSuccess={handleSuccess}
         />
       )}
+
+      {/* Add Connector Modal */}
+      <AddConnectorModal
+        isOpen={showAddModal}
+        onClose={handleCloseAddModal}
+        onSuccess={handleSuccess}
+      />
+
     </div>
   );
 };

@@ -5,18 +5,49 @@ from datetime import datetime
 from typing import List
 import requests
 
+from datatypes import McpServerToolItem, ToolType, McpConnectorTemplateItem
+
 # Add parent directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi_mcp.openapi.convert import convert_openapi_to_mcp_tools
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
-from mcp_tools.connectors import get_all_connectors, get_connector_schema
-from api.models import McpServer, McpServerToken, McpServerTool
-from api.database import get_session
+from pydantic import BaseModel
+from models import McpConnector, McpServer, McpServerToken, McpServerTool
+from database import get_session
+from utils import store_logo
+
 
 app = FastAPI(title="MCP Tools API", description="API for MCP Tools", version="0.1.0")
+
+
+class CreateConnectorRequest(BaseModel):
+    connector_url: str
+
+
+class CreateToolFromTemplateRequest(BaseModel):
+    connector_id: int
+    template_name: str
+    template_params: dict
+    tool_name: str
+    description: str
+
+
+def get_all_connectors(session: Session):
+    connectors = session.exec(
+                    select(McpConnector)
+                ).all()
+    return connectors
+
+
+def create_connector_record(connector_data: dict, session: Session):
+    connector = McpConnector(**connector_data)
+    session.add(connector)
+    session.commit()
+    session.refresh(connector)
+    return connector
+
 
 # Create database tables on startup
 # NOTE: Table creation is now handled by Alembic migrations
@@ -46,13 +77,74 @@ def read_root():
 
 
 @router.get("/connectors")
-def get_connectors() -> list:
-    return get_all_connectors()
+def get_connectors(session: Session = Depends(get_session)) -> list:
+    connectors = session.exec(select(McpConnector)).all()
+    return connectors
 
 
-@router.get("/connector-schema/{connector_name}")
-def get_connector_schema_endpoint(connector_name: str) -> dict:
-    return get_connector_schema(connector_name)
+@router.post("/connectors")
+def create_connector(request: CreateConnectorRequest, session: Session = Depends(get_session)) -> dict:
+    req = requests.get(request.connector_url)
+    if req.status_code != 200:
+        raise HTTPException(status_code=400, detail="Failed to get connector schema")
+    connector_data = req.json()
+    
+    # Extract required fields with defaults
+    name = connector_data.get("name", "Unknown Connector")
+    tools = connector_data.get("tools", [])
+    templates = connector_data.get("templates", {})
+    server_config = connector_data.get("config", {})
+    
+    # Convert tools to McpConnectorToolItem objects
+    # from datatypes import McpConnectorToolItem
+    # tools_config = [McpConnectorToolItem(**tool) for tool in tools]
+    
+    # # Convert templates to McpServerTemplateItem objects
+    # from datatypes import McpServerTemplateItem
+    # templates_config = [McpServerTemplateItem(**template) for template in templates]
+
+    connector_data = {
+        "url": request.connector_url,
+        "description": connector_data.get("description", "No description available"),
+        "version": connector_data.get("version", "1.0.0"),
+        "source_logo_url": connector_data.get("logo_url", "").encode() if connector_data.get("logo_url") else b"",
+        "logo_url": connector_data.get("logo_url", ""),
+        "name": name,
+        "tools_config": tools,
+        "templates_config": templates,
+        "server_config": server_config
+    }
+    data = create_connector_record(connector_data, session)
+    logo_url = connector_data.get("logo_url", "")
+    if logo_url and logo_url.strip():
+        try:
+            store_logo(logo_url, data.name)
+        except Exception as e:
+            print(f"Warning: Failed to store logo: {str(e)}")
+            # Continue without failing the entire request
+    
+    return {
+        "id": data.id,
+        "name": data.name,
+        "url": data.url,
+        "description": data.description,
+        "version": data.version,
+        "created_at": data.created_at.isoformat(),
+        "updated_at": data.updated_at.isoformat(),
+        "is_active": data.is_active
+    }
+
+
+@router.get("/connector-schema/{connector_id}")
+def get_connector_schema_endpoint(connector_id: int, session: Session = Depends(get_session)) -> dict:
+    # Try to get schema from database first
+    statement = select(McpConnector).where(
+        McpConnector.id == connector_id,
+        McpConnector.is_active.is_(True)
+    )
+    connector = session.exec(statement).first()
+
+    return connector.server_config
 
 
 @router.post("/servers")
@@ -60,9 +152,7 @@ def create_server(
     server_data: dict,
     session: Session = Depends(get_session)
 ) -> dict:
-    # Ensure connector_name and server_name are provided
-    if "connector_name" not in server_data:
-        raise HTTPException(status_code=400, detail="connector_name is required")
+    # Ensure connector_id and server_name are provided
     if "server_name" not in server_data:
         raise HTTPException(status_code=400, detail="server_name is required")
     
@@ -81,32 +171,37 @@ def create_server(
                     detail="Invalid token_expires_at format"
                 )
     
-    mcp_server = McpServer(**server_data)
+    if "connector_id" not in server_data:
+        raise HTTPException(status_code=400, detail="connector_id is required")
+    
+    connector_id = server_data.pop("connector_id")
+    
+    mcp_server = McpServer(**server_data, connector_id=connector_id)
     session.add(mcp_server)
     session.commit()
     session.refresh(mcp_server)
 
-    connector_urls = {
-        "sql_db": "http://localhost:8010/openapi.json"
-    }
-    openapi_url = connector_urls.get(mcp_server.connector_name)
+    connector = session.get(McpConnector, connector_id)
+    if not connector:
+        raise HTTPException(status_code=404, detail=f"Connector with id {connector_id} not found")
     
-    openapi_data = requests.get(openapi_url).json()
-    tools, _ = convert_openapi_to_mcp_tools(openapi_data)
-    # Generate a secure tool
-    for mcp_tool in tools:
-        db_tool = McpServerTool(
-            tool_name=mcp_tool.name,
-            tool_title=mcp_tool.title if hasattr(mcp_tool, 'title') and mcp_tool.title else mcp_tool.name,
-            tool_description=mcp_tool.description,
-            tool_input_schema=mcp_tool.input_schema if hasattr(mcp_tool, 'input_schema') else (mcp_tool.inputSchema if hasattr(mcp_tool, 'inputSchema') else {}),
-            tool_output_schema={},
-            mcp_server_id=mcp_server.id
-        )
+    tools_list = connector.tools_config
 
-        session.add(db_tool)
-        session.commit()
-        session.refresh(db_tool)
+    tools = []
+    for tool in tools_list:
+        tool = McpServerToolItem(**tool)
+        tool.is_active = True
+        tool.tool_type = ToolType.static
+        tools.append(tool.model_dump())
+
+    db_tool = McpServerTool(
+        tools=tools,
+        mcp_server_id=mcp_server.id,
+    )
+
+    session.add(db_tool)
+    session.commit()
+    session.refresh(db_tool)
     # Generate a secure token
     token_value = f"mcp_token_{secrets.token_urlsafe(32)}"
     token = McpServerToken(
@@ -118,12 +213,11 @@ def create_server(
     session.commit()
     session.refresh(token)
 
-
     return {
         "status": "created",
         "message": f"Server '{mcp_server.server_name}' created successfully",
         "server_id": mcp_server.id,
-        "connector_name": mcp_server.connector_name,
+        "connector_id": mcp_server.connector_id,
         "server_name": mcp_server.server_name,
         "token": token_value,
         "token_expires_at": token.expires_at.isoformat() if token.expires_at else None
@@ -146,7 +240,7 @@ def list_all_servers(
     return [
         {
             "id": config.id,
-            "connector_name": config.connector_name,
+            "connector_id": config.connector_id,
             "server_name": config.server_name,
             "configuration": config.configuration,
             "created_at": config.created_at.isoformat(),
@@ -176,7 +270,7 @@ def get_server(
     
     return {
         "id": config.id,
-        "connector_name": config.connector_name,
+        "connector_id": config.connector_id,
         "server_name": config.server_name,
         "configuration": config.configuration,
         "created_at": config.created_at.isoformat(),
@@ -217,7 +311,7 @@ def update_server(
             "status": "updated",
             "message": f"Configuration for server '{existing_config.server_name}' updated successfully",
             "server_id": existing_config.id,
-            "connector_name": existing_config.connector_name,
+            "connector_id": existing_config.connector_id,
             "server_name": existing_config.server_name
         }
 
@@ -260,36 +354,22 @@ def delete_server(
             token.is_active = False
             token.updated_at = datetime.utcnow()
             session.add(token)
-        
-        # Mark all related tools as inactive
-        tool_statement = select(McpServerTool).where(
-            McpServerTool.mcp_server_id == server_id,
-            McpServerTool.is_active.is_(True)
-        )
-        tools = session.exec(tool_statement).all()
-        tools_count = len(tools)
-        
-        for tool in tools:
-            tool.is_active = False
-            tool.updated_at = datetime.utcnow()
-            session.add(tool)
-        
+
         # Mark server as inactive
         server.is_active = False
         server.updated_at = datetime.utcnow()
         session.add(server)
-        
+
         # Commit all changes
         session.commit()
-        
+
         return {
             "status": "deleted",
             "message": f"Server '{server.server_name}' and all related data deleted successfully",
             "server_id": server_id,
             "deleted_tokens": tokens_count,
-            "deleted_tools": tools_count
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -306,14 +386,13 @@ def get_server_tools(
     Retrieve the available tools from a specific MCP server.
     Makes a request to the MCP server endpoint using the server's token.
     """
-    
+
     # Get the server configuration
     statement = select(McpServer).where(
         McpServer.id == server_id,
         McpServer.is_active.is_(True)
     )
-    server = session.exec(statement).first()
-    
+    server: McpServer = session.exec(statement).first()
     if not server:
         raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
     
@@ -323,37 +402,115 @@ def get_server_tools(
         McpServerToken.is_active.is_(True)
     )
     token = session.exec(token_statement).first()
-    
+
     if not token:
         raise HTTPException(status_code=404, detail=f"No active token found for server id: {server_id}")
-    
+
     # Check if token is expired
     if token.expires_at and token.expires_at < datetime.utcnow():
         raise HTTPException(status_code=401, detail="Token has expired")
-    
-    # Get tools from database
-    tool_statement = select(McpServerTool).where(
-        McpServerTool.mcp_server_id == server_id,
-        McpServerTool.is_active.is_(True)
-    )
-    db_tools = session.exec(tool_statement).all()
-    
+
+    # Get all tools from database (both active and inactive for management)
+    server_tools: McpServerToolItem = server.server_tools.get_tools()
+
     # Transform database tools to MCP format
     tools = []
-    for tool in db_tools:
+    for tool in server_tools:
         tools.append({
-            "name": tool.tool_name,
-            "description": tool.tool_description,
-            "inputSchema": tool.tool_input_schema if tool.tool_input_schema else {}
+            "id": tool.id,
+            "name": tool.name,
+            "description": tool.description,
+            "inputSchema": tool.inputSchema if tool.inputSchema else {},
+            "is_active": tool.is_active
         })
 
     return {
         "server_id": server.id,
         "server_name": server.server_name,
-        "connector_name": server.connector_name,
+        "connector_id": server.connector_id,
         "tools": tools
     }
+
+
+@router.patch("/servers/{server_id}/tools/{tool_id}")
+def update_tool_status(
+    server_id: int,
+    tool_id: int,
+    update_data: dict,
+    session: Session = Depends(get_session)
+) -> dict:
+    """
+    Update a tool's status (active/inactive).
+    """
+    try:
+        # Verify server exists
+        server_statement = select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.is_active.is_(True)
+        )
+        server = session.exec(server_statement).first()
+
+        if not server:
+            raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
+
+        # Get the tool
+        tool_statement = select(McpServerTool).where(
+            McpServerTool.id == tool_id,
+            McpServerTool.mcp_server_id == server_id
+        )
+        tool = session.exec(tool_statement).first()
+
+        if not tool:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No tool found with id: {tool_id} for server: {server_id}"
+            )
+
+        # Update tool status
+        if "is_active" in update_data:
+            tool.is_active = update_data["is_active"]
+            tool.updated_at = datetime.utcnow()
+            session.add(tool)
+            session.commit()
+            session.refresh(tool)
+
+        return {
+            "status": "updated",
+            "message": f"Tool '{tool.tool_name}' updated successfully",
+            "tool_id": tool.id,
+            "tool_name": tool.tool_name,
+            "is_active": tool.is_active
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update tool: {str(e)}")
+
+
+@router.get("/connectors/{connector_id}/templates")
+def get_templates(
+    connector_id: int,
+    session: Session = Depends(get_session)
+) -> List[McpConnectorTemplateItem]:
+    """
+    Create a new tool based on a connector template.
+    """
+    # Verify connector exists
+    connector_statement = select(McpConnector).where(
+        McpConnector.id == connector_id,
+        McpConnector.is_active.is_(True)
+    )
+    connector = session.exec(connector_statement).first()
     
+    if not connector:
+        raise HTTPException(status_code=404, detail=f"Connector with id {connector_id} not found")
+    
+    # Check if template exists in connector
+    templates = connector.templates_config or []
+    return templates
+
 
 app.include_router(router)
 

@@ -25,6 +25,8 @@ In order to configure the auth header, the config file for the MCP server should
 import requests
 import time
 import json
+from typing import List
+from pydantic import BaseModel, Field
 from fastapi import Depends, FastAPI, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, _StreamingResponse as StreamingResponse
 # from fastapi.responses import StreamingResponse
@@ -44,6 +46,19 @@ app = FastAPI()
 # Scheme for the Authorization header
 token_auth_scheme = HTTPBearer()
 
+
+class CustomQueryTemplate(BaseModel):
+    query: str = Field(description="The query to execute")
+    params: dict = Field(description="The parameters for the query")
+
+
+class Templates(BaseModel):
+    tools: List[CustomQueryTemplate] = Field(description="The custom query template")
+
+
+@app.get("/templates", operation_id="get_templates")
+async def get_templates():
+    return Templates.model_dump()
 
 # Create a private endpoint
 @app.get("/private")
@@ -135,7 +150,12 @@ def dynamic_endpoint(m_name: str):
 class StreamingInterceptorMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         
-
+        # intercept the request stream and stream should be aviable to the call_next
+        async def intercept_stream_generator():
+            async for chunk in request.stream():
+                print(f"Chunk: {chunk.decode('utf-8')}")
+                yield chunk
+        
         # create a new Request bound to the same scope but new receive
         # new_request = Request(request.scope, receive)
         try:
@@ -154,8 +174,11 @@ class StreamingInterceptorMiddleware(BaseHTTPMiddleware):
                     # Your interception logic here
                     # remove specific tools from the response
                     if "result" in chunk.decode('utf-8'):
-                        
-                        response_json = json.loads(chunk.decode('utf-8'))
+                        print(f"Chunk: {chunk.decode('utf-8')}")
+                        chunked_data = chunk.decode('utf-8')
+                        response_json = json.loads(chunked_data)
+                        if "tools/call" in chunked_data:
+                            print(f"Tool call: {chunked_data}")
                         if "result" in response_json and "tools" in response_json["result"]:
                             # get token from request
                             # message = await request.receive()

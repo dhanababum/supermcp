@@ -4,7 +4,7 @@ import { LoadingSpinner, ErrorMessage } from '../../components/common';
 import { ToolsList, ToolDetails } from './components';
 
 const ServerTools = ({ server, onBack }) => {
-  const { tools, loading, error } = useServerTools(server?.id, !!server);
+  const { tools, loading, error, refetch } = useServerTools(server?.id, !!server);
   const [selectedTool, setSelectedTool] = useState(null);
 
   useEffect(() => {
@@ -12,6 +12,10 @@ const ServerTools = ({ server, onBack }) => {
       setSelectedTool(tools[0]);
     }
   }, [tools, selectedTool]);
+
+  const handleToolUpdate = () => {
+    refetch();
+  };
 
   if (!server) {
     return (
@@ -39,7 +43,7 @@ const ServerTools = ({ server, onBack }) => {
           {server.server_name} - Tools
         </h1>
         <p className="text-gray-600">
-          Available tools for {server.connector_name}
+          Available tools for {server.connector_id}
         </p>
       </div>
 
@@ -66,6 +70,9 @@ const ServerTools = ({ server, onBack }) => {
               tools={tools}
               selectedTool={selectedTool}
               onSelectTool={setSelectedTool}
+              serverId={server.id}
+              onToolUpdate={handleToolUpdate}
+              server={server}
             />
           </div>
 

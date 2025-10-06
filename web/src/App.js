@@ -1,11 +1,20 @@
-import React, { useState } from 'react';
-import { Sidebar, Header, Banner } from './components/layout';
-import { Dashboard, Connectors, Servers, ServerTools } from './pages';
+import React, { useState, useEffect } from 'react';
+import { Sidebar, Banner } from './components/layout';
+import { Dashboard, Connectors, Servers, ServerTools, MCPClient } from './pages';
+import OAuthCallback from './pages/OAuthCallback';
 
 function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentRoute, setCurrentRoute] = useState('dashboard');
   const [selectedServer, setSelectedServer] = useState(null);
+
+  // Handle URL-based routing for OAuth callback
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/oauth/callback') {
+      setCurrentRoute('oauth-callback');
+    }
+  }, []);
 
   const handleNavigate = (route) => {
     setCurrentRoute(route);
@@ -41,6 +50,10 @@ function App() {
             onBack={handleBackToServers}
           />
         );
+      case 'mcp-client':
+        return <MCPClient />;
+      case 'oauth-callback':
+        return <OAuthCallback />;
       case 'dashboard':
       default:
         return <Dashboard />;
@@ -60,7 +73,7 @@ function App() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header />
+        {/* <Header /> */}
 
         {/* Banner */}
         <Banner />

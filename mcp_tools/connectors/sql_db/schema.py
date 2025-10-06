@@ -1,6 +1,7 @@
 from enum import Enum
 import pydantic
-from pydantic import Field, SecretStr
+from pydantic import ConfigDict, Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ConnectionType(Enum):
@@ -19,3 +20,4 @@ class SqlDbSchema(pydantic.BaseModel):
     host: str = Field(description="The host for the database connection")
     port: int = Field(description="The port for the database connection")
     database: str = Field(description="The database for the database connection")
+    # model_config = ConfigDict(extra="allow")

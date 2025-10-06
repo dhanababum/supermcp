@@ -27,23 +27,29 @@ const ConnectorCard = ({ connector, onConfigure }) => {
           <span className="font-medium text-gray-700">{connector.version}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Author:</span>
-          <span className="font-medium text-gray-700">{connector.author}</span>
+          <span>URL:</span>
+          <span className="font-medium text-gray-700 truncate max-w-32" title={connector.url}>
+            {connector.url}
+          </span>
         </div>
       </div>
       
-      <div className="flex items-center space-x-2 pt-4 border-t border-gray-100">
-        <button 
-          onClick={() => onConfigure(connector)}
-          className="flex-1 px-3 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
-        >
-          Create Server
-        </button>
-        <button className="px-3 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-          </svg>
-        </button>
+      <div className="space-y-2 pt-4 border-t border-gray-100">
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => onConfigure(connector)}
+            className="flex-1 px-3 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
+          >
+            Create Server
+          </button>
+        </div>
+        <div className="flex items-center justify-center">
+          <button className="px-3 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

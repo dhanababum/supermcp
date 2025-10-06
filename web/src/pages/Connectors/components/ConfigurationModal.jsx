@@ -30,7 +30,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
     }
 
     const serverData = {
-      connector_name: connector.id,
+      connector_id: connector.id,
       server_name: serverName.trim(),
       configuration: data,
       token_expires_at: tokenExpiresAt || null
@@ -42,7 +42,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
           `✅ ${response.message}`,
           ``,
           `Server ID: ${response.server_id}`,
-          `Connector: ${response.connector_name}`,
+          `Connector: ${response.connector_id}`,
           `Server Name: ${response.server_name}`,
           `Token: ${response.token}`,
           ``,

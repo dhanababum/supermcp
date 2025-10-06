@@ -15,5 +15,6 @@ def get_all_connectors():
 def get_connector_schema(connector_name: str) -> dict:
     connector_schemas = {
         "sql_db": SqlDbSchema.model_json_schema(),
+        "sql_db_mcp": SqlDbSchema.model_json_schema(),
     }
     return connector_schemas.get(connector_name)

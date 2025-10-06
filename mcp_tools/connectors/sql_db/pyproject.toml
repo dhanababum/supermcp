@@ -10,5 +10,6 @@ dependencies = [
     "fastapi-mcp>=0.4.0",
     "fastmcp>=2.12.4",
     "mcp[cli]>=1.15.0",
+    "pyjwt>=2.10.1",
     "sqlalchemy[asyncio]>=2.0.43",
 ]

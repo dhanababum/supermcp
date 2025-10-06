@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Import SQLModel and models
 from sqlmodel import SQLModel
-from models import McpServer, McpServerToken  # Import all your models here
+# Import models to register them with SQLModel metadata
+import models  # This will register all models with SQLModel.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

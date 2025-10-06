@@ -57,7 +57,7 @@ const ServerTable = ({ servers, onView, onDelete }) => {
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900">{server.connector_name}</div>
+                <div className="text-sm text-gray-900">{server.connector_id}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900">

@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.16.5",
     "fastapi>=0.118.0",
     "fastapi-mcp>=0.4.0",
+    "pillow>=11.3.0",
     "psycopg2-binary>=2.9.10",
     "python-dateutil>=2.9.0.post0",
     "requests>=2.32.5",
