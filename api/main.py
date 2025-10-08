@@ -1,14 +1,23 @@
+from ast import Dict
 import sys
 import secrets
+import logging
 from pathlib import Path
 from datetime import datetime
-from typing import List
+from typing import Any, Dict, List
 import requests
 
-from datatypes import McpServerToolItem, ToolType, McpConnectorTemplateItem
+from datatypes import McpConnectorToolItem, McpServerToolItem, ToolType, McpConnectorTemplateItem
 
 # Add parent directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Disable SQLAlchemy logging to reduce verbosity
+logging.getLogger('sqlalchemy').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +25,8 @@ from sqlmodel import Session, select
 from pydantic import BaseModel
 from models import McpConnector, McpServer, McpServerToken, McpServerTool
 from database import get_session
-from utils import store_logo
+from utils import store_logo, get_tool_id
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 
 app = FastAPI(title="MCP Tools API", description="API for MCP Tools", version="0.1.0")
@@ -32,6 +42,31 @@ class CreateToolFromTemplateRequest(BaseModel):
     template_params: dict
     tool_name: str
     description: str
+
+
+class AuthRequest(BaseModel):
+    token: str
+
+
+token_header = HTTPBearer()
+
+
+# create auth dependency & verify with McpServerToken
+def get_auth_token(
+    token: HTTPAuthorizationCredentials = Depends(token_header),
+    session: Session = Depends(get_session)
+):
+    print(f"Verifying token: {token.credentials}")
+    token_statement = select(McpServerToken).where(
+        McpServerToken.token == token.credentials,
+        McpServerToken.is_active.is_(True)
+    )
+    server_token = session.exec(token_statement).first()
+    print(f"Token: {type(server_token)}")
+    if not server_token:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    print("..........")
+    return server_token
 
 
 def get_all_connectors(session: Session):
@@ -65,6 +100,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+root_router = APIRouter()
 
 router = APIRouter(
     prefix="/api",
@@ -187,21 +224,18 @@ def create_server(
     
     tools_list = connector.tools_config
 
-    tools = []
     for tool in tools_list:
         tool = McpServerToolItem(**tool)
-        tool.is_active = True
-        tool.tool_type = ToolType.static
-        tools.append(tool.model_dump())
+        server_tool = McpServerTool(
+            mcp_server_id=mcp_server.id,
+            name=tool.name,
+            tool=tool.model_dump(),
+            tool_type=ToolType.static.value,
+            is_active=True
+        )
+        session.add(server_tool)
 
-    db_tool = McpServerTool(
-        tools=tools,
-        mcp_server_id=mcp_server.id,
-    )
-
-    session.add(db_tool)
     session.commit()
-    session.refresh(db_tool)
     # Generate a secure token
     token_value = f"mcp_token_{secrets.token_urlsafe(32)}"
     token = McpServerToken(
@@ -249,6 +283,47 @@ def list_all_servers(
         }
         for config in configs
     ]
+
+
+@router.get("/servers/with-tokens")
+def get_servers_with_tokens(session: Session = Depends(get_session)) -> List[dict]:
+    """
+    Retrieve all active MCP servers with their active tokens.
+    """
+    statement = select(McpServer).where(McpServer.is_active.is_(True))
+    servers = session.exec(statement).all()
+    
+    result = []
+    for server in servers:
+        # Get active tokens for this server
+        token_statement = select(McpServerToken).where(
+            McpServerToken.mcp_server_id == server.id,
+            McpServerToken.is_active.is_(True)
+        )
+        tokens = session.exec(token_statement).all()
+        
+        server_data = {
+            "id": server.id,
+            "connector_id": server.connector_id,
+            "server_name": server.server_name,
+            "server_url": server.server_url,
+            "created_at": server.created_at.isoformat(),
+            "updated_at": server.updated_at.isoformat(),
+            "is_active": server.is_active,
+            "tokens": [
+                {
+                    "id": token.id,
+                    "token": token.token,
+                    "expires_at": token.expires_at.isoformat() if token.expires_at else None,
+                    "created_at": token.created_at.isoformat(),
+                    "is_active": token.is_active
+                }
+                for token in tokens
+            ]
+        }
+        result.append(server_data)
+    
+    return result
 
 
 @router.get("/servers/{server_id}")
@@ -377,16 +452,14 @@ def delete_server(
         raise HTTPException(status_code=500, detail=f"Failed to delete server: {str(e)}")
 
 
-@router.get("/servers/{server_id}/tools")
-def get_server_tools(
+@router.get("/servers/{server_id}/tools/database")
+def get_database_tools(
     server_id: int,
     session: Session = Depends(get_session)
 ) -> dict:
     """
-    Retrieve the available tools from a specific MCP server.
-    Makes a request to the MCP server endpoint using the server's token.
+    Retrieve tools from database with tool_type information.
     """
-
     # Get the server configuration
     statement = select(McpServer).where(
         McpServer.id == server_id,
@@ -396,32 +469,79 @@ def get_server_tools(
     if not server:
         raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
     
-    # Get an active token for this server
-    token_statement = select(McpServerToken).where(
-        McpServerToken.mcp_server_id == server_id,
-        McpServerToken.is_active.is_(True)
-    )
-    token = session.exec(token_statement).first()
-
-    if not token:
-        raise HTTPException(status_code=404, detail=f"No active token found for server id: {server_id}")
-
-    # Check if token is expired
-    if token.expires_at and token.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=401, detail="Token has expired")
-
     # Get all tools from database (both active and inactive for management)
-    server_tools: McpServerToolItem = server.server_tools.get_tools()
-
+    server_tools: List[McpServerTool] = server.server_tools
+    
+    if not server_tools:
+        return {
+            "server_id": server.id,
+            "server_name": server.server_name,
+            "connector_id": server.connector_id,
+            "tools": []
+        }
+    
     # Transform database tools to MCP format
     tools = []
-    for tool in server_tools:
+    for server_tool in server_tools:
+        tool = McpServerToolItem(**server_tool.tool)
+        tool_type_value = server_tool.tool_type.value if server_tool.tool_type else "static"
         tools.append({
-            "id": tool.id,
+            "id": server_tool.id,
             "name": tool.name,
             "description": tool.description,
             "inputSchema": tool.inputSchema if tool.inputSchema else {},
-            "is_active": tool.is_active
+            "tool_type": tool_type_value,  # Show tool_type
+            "is_active": server_tool.is_active
+        })
+
+    return {
+        "server_id": server.id,
+        "server_name": server.server_name,
+        "connector_id": server.connector_id,
+        "tools": tools
+    }
+
+
+@router.get("/servers/{server_id}/tools")
+def get_server_tools(
+    server_id: int,
+    session: Session = Depends(get_session)
+) -> dict:
+    """
+    Retrieve tools from database with tool_type information.
+    """
+    # Get the server configuration
+    statement = select(McpServer).where(
+        McpServer.id == server_id,
+        McpServer.is_active.is_(True)
+    )
+    server: McpServer = session.exec(statement).first()
+    if not server:
+        raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
+    
+    # Get all tools from database (both active and inactive for management)
+    server_tools: List[McpServerTool] = server.server_tools
+    
+    if not server_tools:
+        return {
+            "server_id": server.id,
+            "server_name": server.server_name,
+            "connector_id": server.connector_id,
+            "tools": []
+        }
+    
+    # Transform database tools to MCP format
+    tools = []
+    for server_tool in server_tools:
+        tool = McpServerToolItem(**server_tool.tool)
+        tool_type_value = server_tool.tool_type.value if server_tool.tool_type else "static"
+        tools.append({
+            "id": server_tool.id,
+            "name": tool.name,
+            "description": tool.description,
+            "inputSchema": tool.inputSchema if tool.inputSchema else {},
+            "tool_type": tool_type_value,  # Show tool_type
+            "is_active": server_tool.is_active
         })
 
     return {
@@ -444,15 +564,6 @@ def update_tool_status(
     """
     try:
         # Verify server exists
-        server_statement = select(McpServer).where(
-            McpServer.id == server_id,
-            McpServer.is_active.is_(True)
-        )
-        server = session.exec(server_statement).first()
-
-        if not server:
-            raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
-
         # Get the tool
         tool_statement = select(McpServerTool).where(
             McpServerTool.id == tool_id,
@@ -476,9 +587,9 @@ def update_tool_status(
 
         return {
             "status": "updated",
-            "message": f"Tool '{tool.tool_name}' updated successfully",
+            "message": f"Tool '{tool.name}' updated successfully",
             "tool_id": tool.id,
-            "tool_name": tool.tool_name,
+            "tool_name": tool.name,
             "is_active": tool.is_active
         }
 
@@ -487,6 +598,64 @@ def update_tool_status(
     except Exception as e:
         session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update tool: {str(e)}")
+
+
+@router.delete("/servers/{server_id}/tools/{tool_id}")
+def delete_tool(
+    server_id: int,
+    tool_id: int,
+    session: Session = Depends(get_session)
+) -> dict:
+    """
+    Delete a tool from a server.
+    Only allows deletion of dynamic tools for safety.
+    """
+    try:
+        # Get the server
+        server_statement = select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.is_active.is_(True)
+        )
+        server: McpServer = session.exec(server_statement).first()
+        if not server:
+            raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
+
+        # Get the tool
+        tool_statement = select(McpServerTool).where(
+            McpServerTool.id == tool_id,
+            McpServerTool.mcp_server_id == server_id,
+            McpServerTool.is_active.is_(True)
+        )
+        tool: McpServerTool = session.exec(tool_statement).first()
+        if not tool:
+            raise HTTPException(status_code=404, detail=f"No tool found with id: {tool_id}")
+
+        # Check if tool is dynamic (only allow deletion of dynamic tools)
+        if tool.tool_type != ToolType.dynamic:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot delete tool '{tool.name}'. Only dynamic tools can be deleted. This tool is of type '{tool.tool_type.value}'."
+            )
+
+        # Soft delete the tool
+        tool.is_active = False
+        tool.updated_at = datetime.utcnow()
+        session.add(tool)
+        session.commit()
+
+        return {
+            "status": "deleted",
+            "message": f"Dynamic tool '{tool.name}' deleted successfully",
+            "tool_id": tool_id,
+            "tool_name": tool.name,
+            "tool_type": tool.tool_type.value
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete tool: {str(e)}")
 
 
 @router.get("/connectors/{connector_id}/templates")
@@ -510,6 +679,100 @@ def get_templates(
     # Check if template exists in connector
     templates = connector.templates_config or []
     return templates
+
+
+@router.post("/servers/{server_id}/tools")
+def create_tool_from_template(
+    server_id: int,
+    tool_data: dict,
+    session: Session = Depends(get_session)
+) -> McpServerToolItem:
+    """
+    Create a new tool based on a connector template.
+    """
+    tool = McpServerToolItem(**tool_data)
+    server_tool = McpServerTool(
+        mcp_server_id=server_id,
+        name=tool.name,
+        tool=tool.model_dump(),
+        tool_type=ToolType.dynamic.value,
+        is_active=True
+    )
+    session.add(server_tool)
+    session.commit()
+    return server_tool.tool
+
+
+# verify auth token api endpoint
+@router.get("/verify-auth-token")
+def verify_auth_token(
+    auth: McpServerToken = Depends(get_auth_token)
+) -> dict:
+    return {"status": "verified", "message": "Auth token verified successfully"}
+
+
+@app.get("/.well-known/oauth-authorization-server")
+def get_oauth_authorization_server() -> dict:
+    return {
+        "issuer": "https://auth.example.com",
+        "authorization_endpoint": "https://auth.example.com/oauth/authorize",
+        "token_endpoint": "https://auth.example.com/oauth/token",
+        "userinfo_endpoint": "https://auth.example.com/oauth/userinfo",
+        "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
+        "scopes_supported": ["openid", "profile", "email", "read", "write"],
+        "response_types_supported": ["code", "token", "id_token"],
+        "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"],
+        "subject_types_supported": ["public", "pairwise"],
+        "id_token_signing_alg_values_supported": ["RS256", "ES256"],
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+        "claims_supported": ["sub", "iss", "aud", "exp", "iat", "name", "email"],
+        "code_challenge_methods_supported": ["S256", "plain"]
+    }
+
+
+@app.get("/.well-known/oauth-protected-resource")
+def get_oauth_authorization_server() -> dict:
+    return {
+        "issuer": "https://auth.example.com",
+        "authorization_endpoint": "https://auth.example.com/oauth/authorize",
+        "token_endpoint": "https://auth.example.com/oauth/token",
+        "userinfo_endpoint": "https://auth.example.com/oauth/userinfo",
+        "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
+        "scopes_supported": ["openid", "profile", "email", "read", "write"],
+        "response_types_supported": ["code", "token", "id_token"],
+        "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"],
+        "subject_types_supported": ["public", "pairwise"],
+        "id_token_signing_alg_values_supported": ["RS256", "ES256"],
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+        "claims_supported": ["sub", "iss", "aud", "exp", "iat", "name", "email"],
+        "code_challenge_methods_supported": ["S256", "plain"]
+    }
+
+
+@router.get("/tools")
+def get_tools(
+    session: Session = Depends(get_session),
+    token: McpServerToken = Depends(get_auth_token)
+) -> List[Dict[str, Any]]:
+    """
+    Get all tools from database.
+    """
+    print("Getting tools.................")
+    server_tools = session.exec(
+        select(McpServerTool).where(
+            McpServerTool.mcp_server_id == token.mcp_server_id,
+            McpServerTool.is_active.is_(True)
+        )).all()
+    tools = []
+    print(f"Server tools: {len(server_tools)}")
+    print(f"Server ID: {token.mcp_server_id}")
+    for server_tool in server_tools:
+        tool_data = {
+            'tool_type': server_tool.tool_type,
+            'tool': server_tool.tool
+        }
+        tools.append(tool_data)
+    return tools
 
 
 app.include_router(router)

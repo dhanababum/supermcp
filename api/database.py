@@ -1,5 +1,6 @@
 import os
-from sqlmodel import SQLModel, create_engine, Session
+import logging
+from sqlmodel import create_engine, Session
 from typing import Generator
 
 # Get database URL from environment variable or use default
@@ -8,10 +9,16 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:mysecretpassword@localhost:5432/forge_mcptools"
 )
 
+# Disable SQLAlchemy logging
+logging.getLogger('sqlalchemy').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
+logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
+
 # Create engine with connection pooling
 engine = create_engine(
     DATABASE_URL,
-    echo=True,  # Set to False in production
+    echo=False,  # Disabled to prevent verbose logging
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=5,
     max_overflow=10

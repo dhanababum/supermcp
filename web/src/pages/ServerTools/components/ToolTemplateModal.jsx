@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Form from '@rjsf/core';
-import validator from '@rjsf/validator-ajv8';
 
 const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
   const [templates, setTemplates] = useState([]);
@@ -9,6 +7,20 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [step, setStep] = useState(1); // 1: Select template, 2: Fill form, 3: Review
+  const [toolName, setToolName] = useState('');
+  const [toolDescription, setToolDescription] = useState('');
+
+  // Function to extract placeholders from template string
+  const extractPlaceholders = useCallback((str) => {
+    const regex = /\{([^}]+)\}/g;
+    const placeholders = [];
+    let match;
+    while ((match = regex.exec(str)) !== null) {
+      placeholders.push(match[1]);
+    }
+    return [...new Set(placeholders)]; // Remove duplicates
+  }, []);
+
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -50,27 +62,35 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
   const handleTemplateSelect = (template) => {
     setSelectedTemplate(template);
     setFormData({});
-    setStep(2);
+    setStep(3);
   };
 
-  const handleFormChange = ({ formData: data }) => {
-    setFormData(data);
-  };
 
   const handleBack = () => {
-    if (step === 2) {
+    if (step === 3) {
       setStep(1);
       setSelectedTemplate(null);
-    } else if (step === 3) {
-      setStep(2);
+    } else if (step === 4) {
+      setStep(3);
     }
   };
 
   const handleNext = () => {
     if (step === 1) {
-      setStep(2);
-    } else if (step === 2) {
-      setStep(3);
+      // User selected a template, move to step 3 (form configuration)
+      if (selectedTemplate) {
+        setStep(3);
+      } else {
+        return;
+      }
+    } else if (step === 3) {
+      // User configured form, move to step 4 (review)
+      // Validate that tool name is provided
+      if (!toolName.trim()) {
+        setError('Tool name is required. Please enter a tool name.');
+        return;
+      }
+      setStep(4);
     }
   };
 
@@ -79,17 +99,63 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
       setLoading(true);
       setError(null);
 
-      // Create the tool based on template and form data
-      const toolData = {
-        connector_id: server.connector_id,
-        template_name: selectedTemplate.name,
-        template_params: formData,
-        tool_name: `${selectedTemplate.name}_${Date.now()}`, // Generate unique name
-        description: selectedTemplate.description
+      // Generate inputSchema from Dynamic Template Strings
+      const generateInputSchemaFromTemplateStrings = () => {
+        const properties = {};
+        const required = [];
+        
+        // Process each form field to extract placeholders from template strings
+        Object.entries(formData).forEach(([key, value]) => {
+          if (typeof value === 'string' && value.includes('{')) {
+            // Extract placeholders from template string
+            const placeholders = extractPlaceholders(value);
+            
+            // Add each placeholder as a property to the schema
+            placeholders.forEach(placeholder => {
+              if (!properties[placeholder]) {
+                properties[placeholder] = {
+                  type: "string",
+                  description: `Value for placeholder {${placeholder}} in ${key}`
+                };
+                required.push(placeholder);
+              }
+            });
+          }
+        });
+        
+        return {
+          type: "object",
+          properties,
+          required
+        };
       };
 
-      // Call the API to create the tool
-      const response = await fetch('http://localhost:9000/api/tools/from-template', {
+      // Create the tool using the servers/{server_id}/tools endpoint format
+      const toolData = {
+        name: toolName || `${selectedTemplate.name}_${Date.now()}`,
+        title: null,
+        icons: null,
+        description: toolDescription || selectedTemplate.description,
+        inputSchema: generateInputSchemaFromTemplateStrings(),
+        outputSchema: {
+          type: "object",
+          properties: {
+            result: {
+              type: "string"
+            }
+          },
+          required: ["result"]
+        },
+        annotations: null,
+        meta: {
+          "_fastmcp": {
+            tags: []
+          }
+        }
+      };
+
+      // Call the API to create the tool using servers/{server_id}/tools endpoint
+      const response = await fetch(`http://localhost:9000/api/servers/${server.id}/tools`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -127,6 +193,8 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
       setFormData({});
       setError(null);
       setStep(1);
+      setToolName('');
+      setToolDescription('');
       onClose();
     }
   };
@@ -238,8 +306,9 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
             </div>
           )}
 
+
           {/* Step 2: Form Configuration */}
-          {step === 2 && selectedTemplate && (
+          {step === 3 && selectedTemplate && (
             <div>
               <div className="mb-6">
                 <h4 className="text-xl font-semibold text-gray-900 mb-2">Configure Tool Parameters</h4>
@@ -253,158 +322,129 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                 </div>
                 <p className="text-sm text-gray-500 mt-2">{selectedTemplate.description}</p>
               </div>
-              
-              {/* Generate JSON Schema from template format */}
-              <div className="template-form-container">
-                <style>{`
-                  .template-form-container .form-group {
-                    margin-bottom: 1.5rem;
-                    position: relative;
-                    animation: slideInUp 0.3s ease-out;
-                  }
+
+              {/* Tool Name and Description Input Fields */}
+              <div className="mb-8 space-y-6">
+                <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                  <h5 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Tool Information
+                  </h5>
                   
-                  .template-form-container .form-group label {
-                    display: block;
-                    margin-bottom: 0.75rem;
-                    font-weight: 600;
-                    color: #1f2937;
-                    font-size: 0.875rem;
-                    text-transform: capitalize;
-                  }
-                  
-                  .template-form-container .form-group input {
-                    width: 100%;
-                    padding: 0.875rem 1rem;
-                    border: 2px solid #e5e7eb;
-                    border-radius: 0.75rem;
-                    font-size: 0.875rem;
-                    line-height: 1.25rem;
-                    background-color: #ffffff;
-                    transition: all 0.2s ease-in-out;
-                    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-                  }
-                  
-                  .template-form-container .form-group input:hover {
-                    border-color: #d1d5db;
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-                  }
-                  
-                  .template-form-container .form-group input:focus {
-                    outline: none;
-                    border-color: #8b5cf6;
-                    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                    transform: translateY(-1px);
-                  }
-                  
-                  .template-form-container .form-group input::placeholder {
-                    color: #9ca3af;
-                    font-style: italic;
-                  }
-                  
-                  .template-form-container .form-group .field-error {
-                    color: #dc2626;
-                    font-size: 0.75rem;
-                    margin-top: 0.5rem;
-                    font-weight: 500;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                  }
-                  
-                  .template-form-container .form-group .field-error::before {
-                    content: "⚠";
-                    font-size: 0.875rem;
-                  }
-                  
-                  .template-form-container .form-group .field-description {
-                    color: #6b7280;
-                    font-size: 0.75rem;
-                    margin-top: 0.25rem;
-                    font-style: italic;
-                  }
-                  
-                  .template-form-container .form-group .required {
-                    color: #dc2626;
-                    margin-left: 0.25rem;
-                  }
-                  
-                  .template-form-container .form-group .form-control {
-                    position: relative;
-                  }
-                  
-                  .template-form-container .form-group .form-control:focus-within {
-                    transform: translateY(-1px);
-                  }
-                  
-                  .template-form-container .form-group input[type="number"] {
-                    appearance: none;
-                    -moz-appearance: textfield;
-                  }
-                  
-                  .template-form-container .form-group input[type="number"]::-webkit-outer-spin-button,
-                  .template-form-container .form-group input[type="number"]::-webkit-inner-spin-button {
-                    -webkit-appearance: none;
-                    margin: 0;
-                  }
-                  
-                  .template-form-container .form-group:focus-within label {
-                    color: #8b5cf6;
-                  }
-                  
-                  @keyframes slideInUp {
-                    from {
-                      opacity: 0;
-                      transform: translateY(10px);
-                    }
-                    to {
-                      opacity: 1;
-                      transform: translateY(0);
-                    }
-                  }
-                `}</style>
-                {(() => {
-                  const jsonSchema = {
-                    type: selectedTemplate.type || "object",
-                    properties: selectedTemplate.properties || {},
-                    required: selectedTemplate.required || [],
-                    title: `${selectedTemplate.name} Configuration`
-                  };
-                  
-                  return (
-                    <Form
-                      schema={jsonSchema}
-                      formData={formData}
-                      onChange={handleFormChange}
-                      validator={validator}
-                      onSubmit={handleNext}
-                      uiSchema={{
-                        "ui:submitButtonOptions": {
-                          "norender": true
-                        },
-                        "ui:order": selectedTemplate.required || [],
-                        ...Object.keys(selectedTemplate.properties || {}).reduce((uiSchema, key) => {
-                          const prop = selectedTemplate.properties[key];
-                          uiSchema[key] = {
-                            "ui:placeholder": `Enter ${key}${prop.type === 'integer' ? ' (number)' : ''}`,
-                            "ui:widget": prop.type === 'integer' ? 'updown' : 'text',
-                            "ui:classNames": "template-form-field",
-                            "ui:options": {
-                              classNames: "template-input-field"
-                            }
-                          };
-                          return uiSchema;
-                        }, {})
-                      }}
-                    />
-                  );
-                })()}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Tool Name <span className="text-red-500">*</span>
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Enter a unique name for your tool
+                      </p>
+                      <input
+                        type="text"
+                        value={toolName}
+                        onChange={(e) => setToolName(e.target.value)}
+                        placeholder="Enter tool name (e.g., 'Hello World Tool')"
+                        className="w-full px-4 py-3 border-2 border-green-200 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-green-100 focus:border-green-500 transition-all duration-200 bg-white hover:border-green-300"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Tool Description
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Provide a description of what this tool does
+                      </p>
+                      <textarea
+                        value={toolDescription}
+                        onChange={(e) => setToolDescription(e.target.value)}
+                        placeholder="Enter tool description (e.g., 'A tool that greets users with personalized messages')"
+                        className="w-full px-4 py-3 border-2 border-green-200 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-green-100 focus:border-green-500 transition-all duration-200 bg-white hover:border-green-300 resize-none"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Enhanced Form with Dynamic Template String Input for String Properties */}
+              <div className="space-y-6">
+                {Object.entries(selectedTemplate.properties || {}).map(([key, prop]) => (
+                  <div key={key} className="p-6 border border-gray-200 rounded-xl bg-white shadow-sm">
+                    {prop.type === 'string' ? (
+                      // String properties get Dynamic Template String Input functionality
+                      <div>
+                        <div className="mb-4">
+                          <label className="block text-lg font-semibold text-gray-900 mb-2">
+                            {key} <span className="text-blue-600 text-sm">(String - Dynamic Template String)</span>
+                          </label>
+                          <p className="text-sm text-gray-600 mb-3">
+                            This is a string property. You can use dynamic template strings with placeholders like <code className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{'{placeholder}'}</code>
+                          </p>
+                        </div>
+                        
+                        {/* Template String Input */}
+                        <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                          <h5 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                            <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Template String for {key}
+                          </h5>
+                          <p className="text-sm text-gray-600 mb-4">
+                            Enter your template string with placeholders in curly braces like <code className="bg-gray-200 px-1 rounded">{'{name}'}</code>
+                          </p>
+                          <textarea
+                            value={formData[key] || ''}
+                            onChange={(e) => {
+                              const newFormData = { ...formData, [key]: e.target.value };
+                              setFormData(newFormData);
+                            }}
+                            placeholder={`Enter template string for ${key}, e.g., "Hello {name}, you are {age} years old"`}
+                            className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 bg-white hover:border-blue-300 resize-none"
+                            rows={3}
+                          />
+                          {formData[key] && extractPlaceholders(formData[key]).length > 0 && (
+                            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <p className="text-sm font-medium text-blue-700 mb-1">Detected placeholders:</p>
+                              <p className="text-sm text-blue-600">{extractPlaceholders(formData[key]).join(', ')}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      // Non-string properties get regular form inputs
+                      <div>
+                        <label className="block text-lg font-semibold text-gray-900 mb-2">
+                          {key} <span className="text-gray-500 text-sm">({prop.type})</span>
+                        </label>
+                        <p className="text-sm text-gray-500 mb-4">
+                          This is a {prop.type} property. Enter a direct value.
+                        </p>
+                        <input
+                          type={prop.type === 'integer' ? 'number' : 'text'}
+                          value={formData[key] || ''}
+                          onChange={(e) => {
+                            const value = prop.type === 'integer' ? parseInt(e.target.value) || 0 : e.target.value;
+                            setFormData(prev => ({ ...prev, [key]: value }));
+                          }}
+                          placeholder={`Enter ${key} (${prop.type})`}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-gray-100 focus:border-gray-500 transition-all duration-200 bg-white hover:border-gray-300"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
               
             </div>
           )}
 
           {/* Step 3: Review */}
-          {step === 3 && selectedTemplate && (
+          {step === 4 && selectedTemplate && (
             <div>
               <div className="mb-6">
                 <h4 className="text-xl font-semibold text-gray-900 mb-2">Review Tool Configuration</h4>
@@ -417,28 +457,72 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                     <p className="text-sm text-gray-900 font-medium">{selectedTemplate.name}</p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-xl">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Generated Tool Name</label>
-                    <p className="text-sm text-gray-900 font-medium">{selectedTemplate.name}_{Date.now()}</p>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Tool Name</label>
+                    <p className="text-sm text-gray-900 font-medium">{toolName || 'Not specified'}</p>
                   </div>
                 </div>
                 
                 <div className="bg-gray-50 p-4 rounded-xl">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Template Description</label>
                   <p className="text-sm text-gray-900">{selectedTemplate.description}</p>
                 </div>
+
+                {toolDescription && (
+                  <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Tool Description</label>
+                    <p className="text-sm text-gray-900">{toolDescription}</p>
+                  </div>
+                )}
+
                 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-3">Input Parameters</label>
                   {Object.keys(formData).length > 0 ? (
-                    <div className="space-y-3">
-                      {Object.entries(formData).map(([key, value]) => (
-                        <div key={key} className="flex justify-between items-center py-3 px-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-                          <span className="font-semibold text-gray-700 capitalize">{key}</span>
-                          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="space-y-6">
+                      {Object.entries(formData).map(([key, value]) => {
+                        const prop = selectedTemplate.properties[key];
+                        const isStringWithPlaceholders = prop?.type === 'string' && value && extractPlaceholders(value).length > 0;
+                        
+                        return (
+                          <div key={key} className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+                            <div className="flex justify-between items-start mb-4">
+                              <span className="text-lg font-semibold text-gray-900 capitalize">{key}</span>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-500">({prop?.type})</span>
+                                {isStringWithPlaceholders && (
+                                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                                    Dynamic Template String
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {isStringWithPlaceholders ? (
+                              <div className="space-y-4">
+                                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                                  <p className="text-sm font-semibold text-blue-700 mb-2">Template String:</p>
+                                  <p className="text-sm text-blue-900 font-mono bg-white p-3 rounded-lg border">
+                                    {value}
+                                  </p>
+                                </div>
+                                
+                                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                                  <p className="text-sm font-semibold text-gray-700 mb-2">Detected Placeholders:</p>
+                                  <p className="text-sm text-gray-600">{extractPlaceholders(value).join(', ')}</p>
+                                </div>
+                                
+                              </div>
+                            ) : (
+                              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                                <p className="text-sm font-semibold text-gray-700 mb-2">Value:</p>
+                                <p className="text-sm text-gray-900 font-mono bg-white p-3 rounded-lg border">
+                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
@@ -454,6 +538,41 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                   <label className="block text-sm font-semibold text-gray-700 mb-3">Raw Form Data</label>
                   <pre className="text-xs bg-white p-3 rounded-lg border overflow-x-auto text-gray-800">
                     {JSON.stringify(formData, null, 2)}
+                  </pre>
+                </div>
+
+                {/* Generated Input Schema Preview */}
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Generated Input Schema</label>
+                  <p className="text-xs text-gray-600 mb-3">
+                    This schema will be generated from your template strings with placeholders
+                  </p>
+                  <pre className="text-xs bg-white p-3 rounded-lg border overflow-x-auto text-gray-800">
+                    {JSON.stringify((() => {
+                      const properties = {};
+                      const required = [];
+                      
+                      Object.entries(formData).forEach(([key, value]) => {
+                        if (typeof value === 'string' && value.includes('{')) {
+                          const placeholders = extractPlaceholders(value);
+                          placeholders.forEach(placeholder => {
+                            if (!properties[placeholder]) {
+                              properties[placeholder] = {
+                                type: "string",
+                                description: `Value for placeholder {${placeholder}} in ${key}`
+                              };
+                              required.push(placeholder);
+                            }
+                          });
+                        }
+                      });
+                      
+                      return {
+                        type: "object",
+                        properties,
+                        required
+                      };
+                    })(), null, 2)}
                   </pre>
                 </div>
               </div>
@@ -487,10 +606,10 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
               >
                 Cancel
               </button>
-              {step < 3 ? (
+              {step < 4 ? (
                 <button
                   onClick={handleNext}
-                  disabled={loading || (step === 1 && !selectedTemplate) || (step === 2 && !selectedTemplate)}
+                  disabled={loading || (step === 1 && !selectedTemplate)}
                   className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold rounded-xl hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl"
                 >
                   <span>Next</span>

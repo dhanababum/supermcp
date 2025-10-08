@@ -15,6 +15,8 @@ Notes:
 """
 import pdb
 import os
+import requests
+from starlette.exceptions import HTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.types import Receive, Scope, Send
 from pydantic import BaseModel
@@ -24,7 +26,7 @@ from fastapi import Request
 from utils import CustomFastMCP as FastMCP
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.tools import Tool
-from fastmcp.tools.tool_transform import ArgTransform
+from fastmcp.tools.tool_transform import ArgTransform, TransformedTool
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from fastmcp.server.middleware.middleware import (
@@ -33,8 +35,9 @@ from fastmcp.server.middleware.middleware import (
 from starlette.responses import FileResponse, JSONResponse
 from mcp.types import Tool as MCPTool
 
+from fastmcp.server.auth import RemoteAuthProvider
 
-from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair
+from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair, TokenVerifier, AccessToken
 from schema import SqlDbSchema
 # Generate a key pair for testing
 key_pair = RSAKeyPair.generate()
@@ -44,6 +47,23 @@ class Table(BaseModel):
     name: str
     description: str
     columns: List[str]
+
+
+class CustomTokenVerifier(TokenVerifier):
+    async def verify_token(self, token: str) -> AccessToken | None:
+        print("Verifying token................")
+        req = requests.get(
+            "http://127.0.0.1:9000/api/verify-auth-token",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        # token = "dummy"
+        if req.status_code != 200:
+            return None
+        return AccessToken(
+            token=token,
+            client_id="dummy",
+            scopes=["read", "write", "admin"]
+        )
 
 
 # Configure your server with the public key
@@ -79,14 +99,17 @@ def user_from_auth_header(auth: str | None) -> str | None:
     return TOKENS.get(tok)
 
 
+verifier = CustomTokenVerifier(
+    base_url="http://127.0.0.1:9000",
+)
+
+
 # ---------- Create MCP server
 mcp = FastMCP(
     "owner-demo",
     # stateless_http=True,
-    # auth=verifier,
+    auth=verifier,
 )
-
-
 
 # @mcp.custom_route("/hello", methods=["GET"])
 # def hello(request: Request) -> str:
@@ -94,7 +117,7 @@ mcp = FastMCP(
 
 
 @mcp.tool(enabled=True)
-def hello_tool_x(name: str, age: int) -> Table:
+def hello_tool_x(name: str, age: int) -> str:
     """
     Hello tool
     """
@@ -209,12 +232,25 @@ class OwnerFilterMiddleware(Middleware):
         # Get the full list of Tool objects from the inner server
         tools = await call_next(context)  # list[Tool]
         access_token = get_access_token()
+        print(f"Context: {context}")
         print(f"Access token: {access_token}")
         print(f"Tools: {tools}")
+        # req = requests.get("http://127.0.0.1:9000/api/")
+        online_tools = await self.get_active_tools(access_token.token)
+        print(f"Online tools: {online_tools}")
+        for tool in online_tools:
+            tools.append(mcp.add_tool(TransformedTool(tool)))
+        # tools = [tool for tool in tools if tool.name in online_tools]
         return tools
+    
+    async def get_active_tools(self, access_token: str):
+        req = requests.get("http://127.0.0.1:9000/api/tools", headers={"Authorization": f"Bearer {access_token}"})
+        return req.json()
 
 # Test getting tools (await the coroutine)
-# mcp.add_middleware(OwnerFilterMiddleware())
+mcp.add_middleware(OwnerFilterMiddleware())
+print("Listing middleware................")
+print(mcp.middleware)
 app = mcp.http_app()
 app.add_middleware(
     CORSMiddleware,
@@ -224,6 +260,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
     expose_headers=["mcp-session-id"]
 )
+# mcp.add_middleware(OwnerFilterMiddleware())
 # ---------- Run server (HTTP transport so Postman / curl can talk JSON-RPC)
 if __name__ == "__main__":
     # Run an HTTP streamable MCP endpoint at http://127.0.0.1:8000/mcp

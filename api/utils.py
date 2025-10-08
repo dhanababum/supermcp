@@ -48,3 +48,7 @@ def get_logo(name: str):
         return FileResponse(os.path.join(settings.LOGO_STORAGE_PATH, name))
     else:
         raise ValueError(f"Invalid logo storage type: {settings.LOGO_STORAGE_TYPE}")
+
+
+def get_tool_id(name: str):
+    return name.replace("_", "-")

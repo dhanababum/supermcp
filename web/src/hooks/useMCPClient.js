@@ -1,31 +1,49 @@
 import React from 'react';
 import { useMcp } from 'use-mcp/react';
 
-export const useMCPClient = (serverUrl, transportType = 'auto') => {
+export const useMCPClient = (serverUrl, transportType = 'auto', authToken = null) => {
   // Ensure the URL is properly formatted for MCP
   const normalizedUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
   
   const debug = true; // Enable debug logging
   
-  const mcpOptions = {
-    url: normalizedUrl,
-    transportType: transportType === 'streamable-http' ? 'http' : transportType === 'sse' ? 'sse' : 'auto',
-    debug,
-    // Disable all automatic retry mechanisms
-    autoRetry: false,
-    autoReconnect: false, // Disable automatic reconnection
-    preventAutoAuth: true,
-    // OAuth configuration for proper session handling
-    clientName: 'forge-mcp-client',
-    clientUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
-    callbackUrl: typeof window !== 'undefined' ? `${window.location.origin}/oauth/callback` : 'http://localhost:3000/oauth/callback',
-    storageKeyPrefix: 'forge-mcp',
-    // Add client configuration for better session handling
-    clientConfig: {
-      name: 'forge-mcp-client',
-      version: '1.0.0'
+  // Create mcpOptions with proper dependency tracking
+  const mcpOptions = React.useMemo(() => {
+    const options = {
+      url: normalizedUrl,
+      transportType: transportType === 'streamable-http' ? 'http' : transportType === 'sse' ? 'sse' : 'auto',
+      debug,
+      // Disable all automatic retry mechanisms
+      autoRetry: false,
+      autoReconnect: false, // Disable automatic reconnection
+      preventAutoAuth: true,
+      // OAuth configuration for proper session handling
+      clientName: 'forge-mcp-client',
+      clientUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+      callbackUrl: typeof window !== 'undefined' ? `${window.location.origin}/oauth/callback` : 'http://localhost:3000/oauth/callback',
+      storageKeyPrefix: 'forge-mcp',
+      // Add client configuration for better session handling
+      clientConfig: {
+        name: 'forge-mcp-client',
+        version: '1.0.0'
+      }
+    };
+
+    // Add authentication headers if token is provided
+    if (authToken) {
+      options.customHeaders = {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      };
+    } else {
+      options.customHeaders = {
+        'Content-Type': 'application/json'
+      };
     }
-  };
+
+    console.log('options######## ', options);
+    return options;
+  }, [normalizedUrl, transportType, authToken, debug]);
 
   const {
     tools,
@@ -46,6 +64,19 @@ export const useMCPClient = (serverUrl, transportType = 'auto') => {
     authenticate,
     clearStorage
   } = useMcp(mcpOptions);
+
+  // Debug the useMcp hook state
+  React.useEffect(() => {
+    if (debug) {
+      console.log('useMcp hook state:', { 
+        state, 
+        error, 
+        toolsCount: tools?.length || 0,
+        authUrl: authUrl ? 'present' : 'none',
+        hasAuthToken: !!authToken
+      });
+    }
+  }, [state, error, tools, authUrl, authToken, debug]);
 
   // Map the use-mcp state to our expected interface
   const isConnected = state === 'ready';

@@ -3,8 +3,8 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel, Relationship
-from pydantic import model_validator
-from datatypes import McpConnectorToolItem, McpConnectorTemplateItem, McpServerTemplateItem, McpServerToolItem
+from datatypes import McpConnectorToolItem, McpConnectorTemplateItem, McpServerToolItem
+from datatypes import ToolType
 
 
 class McpConnector(SQLModel, table=True):
@@ -43,6 +43,7 @@ class McpServer(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     connector_id: str = Field(description="The connector id (e.g., 'sql_db')")
     server_name: str = Field(description="The human-readable server name")
+    server_url: Optional[str] = Field(default=None, description="The MCP server URL for connections")
     configuration: dict = Field(sa_column=Column(JSONB), description="The dynamic server data as JSONB")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="When the server was created")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the server was last updated")
@@ -51,7 +52,7 @@ class McpServer(SQLModel, table=True):
     tokens: List["McpServerToken"] = Relationship(back_populates="server")
 
     # One-to-many relationship: one server has many tools
-    server_tools: Optional["McpServerTool"] = Relationship(back_populates="server")
+    server_tools: List["McpServerTool"] = Relationship(back_populates="server")
 
     class Config:
         arbitrary_types_allowed = True
@@ -90,25 +91,21 @@ class McpServerTool(SQLModel, table=True):
     """
     __tablename__ = "mcp_server_tools"
     __table_args__ = {"extend_existing": True}
-    
+
     id: Optional[int] = Field(default=None, primary_key=True)
     mcp_server_id: Optional[int] = Field(
         default=None,
         foreign_key="mcp_servers.id",
         description="Foreign key to the MCP server"
     )
-    tools: List[McpServerToolItem] = Field(sa_column=Column(JSONB), description="The tools as JSONB")
+    name: str = Field(description="The name of the tool")
+    tool: McpServerToolItem = Field(sa_column=Column(JSONB), description="The tools as JSONB")
+    tool_type: ToolType = Field(description="The type of the tool")
+    is_active: bool = Field(default=True, description="Whether this tool is active")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="When the tool was created")
+    updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the tool was last updated")
     # Many-to-one relationship: many tools belong to one server
     server: Optional[McpServer] = Relationship(back_populates="server_tools")
-
-    def get_tool(self, tool_id: str):
-        for tool in self.tools:
-            if tool.id == tool_id:
-                return tool
-        return None
-
-    def get_tools(self, offset: int = 0, limit: int = 10):
-        return [McpServerToolItem(**tool) for tool in self.tools[offset:offset+limit]]
 
     class Config:
         arbitrary_types_allowed = True

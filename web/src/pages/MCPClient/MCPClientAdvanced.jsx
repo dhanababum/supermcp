@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMCPClient } from '../../hooks/useMCPClient';
+import ServerTokenSelector from '../../components/ServerTokenSelector';
 
 const MCPClientAdvanced = () => {
   const [serverUrl, setServerUrl] = useState('http://localhost:8016/mcp');
@@ -10,6 +11,10 @@ const MCPClientAdvanced = () => {
   const [availableTools, setAvailableTools] = useState([]);
   const [selectedTool, setSelectedTool] = useState(null);
   const [toolArguments, setToolArguments] = useState({});
+  const [selectedServer, setSelectedServer] = useState(null);
+  const [selectedToken, setSelectedToken] = useState(null);
+  const [useServerSelection, setUseServerSelection] = useState(true);
+  const [connectionAttempted, setConnectionAttempted] = useState(false);
   const messagesEndRef = useRef(null);
 
   const { 
@@ -23,8 +28,9 @@ const MCPClientAdvanced = () => {
     tools: availableToolsFromHook,
     authUrl,
     authenticate,
-    retry
-  } = useMCPClient(serverUrl, transportType);
+    retry,
+    clearStorage
+  } = useMCPClient(serverUrl, transportType, selectedToken?.token);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,11 +40,47 @@ const MCPClientAdvanced = () => {
     setMessages(prev => [...prev, { type, content, timestamp }]);
   }, []);
 
+  const handleServerTokenSelect = async (server, token) => {
+    console.log('handleServerTokenSelect called with:', { 
+      server: server?.server_name, 
+      token: token ? `${token.token.substring(0, 20)}...` : 'null' 
+    });
+
+    console.log('server############## ', server);
+    
+    // If we're currently connected, disconnect first
+    if (isConnected) {
+      try {
+        await disconnect();
+        addMessage('system', 'Disconnected from previous server');
+      } catch (err) {
+        console.warn('Failed to disconnect from previous server:', err);
+      }
+    }
+    
+    setSelectedServer(server);
+    setSelectedToken(token);
+    setConnectionAttempted(false); // Reset connection attempt flag
+    
+    // Use the server_url from the server data, or fallback to a default
+    const serverUrl = server.server_url || `http://localhost:8016/mcp`;
+    setServerUrl(serverUrl);
+    
+    addMessage('system', `Selected server: ${server.server_name} with token: ${token.token.substring(0, 20)}...`);
+    addMessage('system', `Server URL set to: ${serverUrl}`);
+    addMessage('system', 'Click Connect to establish connection with the new server');
+  };
+
   // Add helpful message about testing
   useEffect(() => {
     addMessage('system', 'MCP Client ready! Enter a server URL to connect.');
     addMessage('system', '💡 Tip: Make sure your MCP server is running and accessible.');
   }, [addMessage]);
+
+  // Debug selectedToken changes
+  useEffect(() => {
+    console.log('selectedToken changed:', selectedToken ? `${selectedToken.token.substring(0, 20)}...` : 'null');
+  }, [selectedToken]);
 
   // Update available tools when they change from the hook
   useEffect(() => {
@@ -56,6 +98,7 @@ const MCPClientAdvanced = () => {
   useEffect(() => {
     if (isConnected) {
       setConnectionStatus('connected');
+      setConnectionAttempted(true);
       addMessage('system', 'Connected to MCP server');
     } else if (isConnecting) {
       setConnectionStatus('connecting');
@@ -66,8 +109,12 @@ const MCPClientAdvanced = () => {
     } else {
       setConnectionStatus('disconnected');
       setAvailableTools([]);
+      // Only reset connectionAttempted if we were previously connected
+      if (connectionAttempted) {
+        setConnectionAttempted(false);
+      }
     }
-  }, [isConnected, isConnecting, needsAuth, addMessage]);
+  }, [isConnected, isConnecting, needsAuth, addMessage, connectionAttempted]);
 
   useEffect(() => {
     if (error) {
@@ -92,33 +139,75 @@ const MCPClientAdvanced = () => {
 
   const handleConnect = async () => {
     try {
+      setConnectionAttempted(true);
       addMessage('system', `Connecting to ${serverUrl} using ${transportType}...`);
-      // The hook automatically connects when URL changes, so we just need to trigger it
+      
+      // If we're already connected, disconnect first
+      if (isConnected) {
+        await disconnect();
+        addMessage('system', 'Disconnected from previous connection');
+      }
+      
+      // The hook automatically connects when URL/token changes
+      // We need to trigger a reconnection by updating the URL slightly
+      const currentUrl = serverUrl;
+      setServerUrl(''); // Clear URL briefly
+      setTimeout(() => {
+        setServerUrl(currentUrl); // Set it back to trigger connection
+      }, 100);
+      
       if (needsAuth && authUrl) {
         authenticate();
       } else {
-        // Connection is handled automatically by the hook
-        addMessage('system', 'Connection initiated automatically');
+        addMessage('system', 'Connection initiated...');
       }
     } catch (err) {
       addMessage('error', `Connection failed: ${err.message}`);
+      setConnectionAttempted(false);
     }
   };
 
   const handleDisconnect = async () => {
     try {
       await disconnect();
+      // Clear any stored authentication data
+      if (clearStorage) {
+        clearStorage();
+      }
       addMessage('system', 'Disconnected from MCP server');
       setConnectionStatus('disconnected');
+      setConnectionAttempted(false);
       setAvailableTools([]);
+      setSelectedTool(null);
+      setToolArguments({});
     } catch (err) {
       addMessage('error', `Disconnect failed: ${err.message}`);
     }
   };
 
-  const handleRetry = () => {
-    addMessage('system', 'Manual retry requested (automatic retry is disabled)...');
-    retry();
+  const handleRetry = async () => {
+    try {
+      addMessage('system', 'Retrying connection...');
+      setConnectionAttempted(true);
+      
+      // If we're connected, disconnect first
+      if (isConnected) {
+        await disconnect();
+        addMessage('system', 'Disconnected for retry');
+      }
+      
+      // Trigger a new connection attempt
+      const currentUrl = serverUrl;
+      setServerUrl(''); // Clear URL briefly
+      setTimeout(() => {
+        setServerUrl(currentUrl); // Set it back to trigger connection
+      }, 100);
+      
+      retry();
+    } catch (err) {
+      addMessage('error', `Retry failed: ${err.message}`);
+      setConnectionAttempted(false);
+    }
   };
 
   const handleAuthenticate = () => {
@@ -143,12 +232,86 @@ const MCPClientAdvanced = () => {
     }
   };
 
+  // Convert string arguments to proper types based on JSON schema
+  const convertArgumentsToProperTypes = (args, schema) => {
+    if (!schema || !schema.properties) {
+      return args;
+    }
+
+    const converted = {};
+    
+    Object.entries(args).forEach(([key, value]) => {
+      const prop = schema.properties[key];
+      if (!prop || value === '' || value === null || value === undefined) {
+        converted[key] = value;
+        return;
+      }
+
+      switch (prop.type) {
+        case 'integer':
+          const intValue = parseInt(value, 10);
+          if (isNaN(intValue)) {
+            console.warn(`Invalid integer value for ${key}: ${value}`);
+            converted[key] = value; // Keep original value if conversion fails
+          } else {
+            converted[key] = intValue;
+          }
+          break;
+        case 'number':
+          const floatValue = parseFloat(value);
+          if (isNaN(floatValue)) {
+            console.warn(`Invalid number value for ${key}: ${value}`);
+            converted[key] = value; // Keep original value if conversion fails
+          } else {
+            converted[key] = floatValue;
+          }
+          break;
+        case 'boolean':
+          // Handle various boolean representations
+          if (typeof value === 'string') {
+            converted[key] = value.toLowerCase() === 'true' || value === '1';
+          } else {
+            converted[key] = Boolean(value);
+          }
+          break;
+        case 'array':
+          // Try to parse as JSON array, fallback to string
+          try {
+            converted[key] = JSON.parse(value);
+          } catch {
+            converted[key] = value;
+          }
+          break;
+        case 'object':
+          // Try to parse as JSON object, fallback to string
+          try {
+            converted[key] = JSON.parse(value);
+          } catch {
+            converted[key] = value;
+          }
+          break;
+        default:
+          // For string and other types, keep as is
+          converted[key] = value;
+      }
+    });
+
+    return converted;
+  };
+
   const handleCallTool = async () => {
     if (!selectedTool || !isConnected) return;
 
     try {
       addMessage('user', `Calling tool: ${selectedTool.name}`);
-      const result = await callTool(selectedTool.name, toolArguments);
+      
+      // Convert tool arguments to proper types based on schema
+      const convertedArguments = convertArgumentsToProperTypes(toolArguments, selectedTool.inputSchema);
+      
+      console.log('Original arguments:', toolArguments);
+      console.log('Converted arguments:', convertedArguments);
+      
+      const result = await callTool(selectedTool.name, convertedArguments);
       addMessage('server', `Tool result: ${JSON.stringify(result, null, 2)}`);
     } catch (err) {
       addMessage('error', `Tool call failed: ${err.message}`);
@@ -167,23 +330,68 @@ const MCPClientAdvanced = () => {
       return <div className="text-sm text-gray-500">No arguments required</div>;
     }
 
-    return Object.entries(tool.inputSchema.properties).map(([key, prop]) => (
-      <div key={key} className="mb-3">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {key} {tool.inputSchema.required?.includes(key) && <span className="text-red-500">*</span>}
-        </label>
-        <input
-          type={prop.type === 'number' ? 'number' : 'text'}
-          value={toolArguments[key] || ''}
-          onChange={(e) => setToolArguments(prev => ({ ...prev, [key]: e.target.value }))}
-          placeholder={prop.description || `Enter ${key}`}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-        />
-        {prop.description && (
-          <div className="text-xs text-gray-500 mt-1">{prop.description}</div>
-        )}
-      </div>
-    ));
+    return Object.entries(tool.inputSchema.properties).map(([key, prop]) => {
+      const getInputType = () => {
+        switch (prop.type) {
+          case 'integer':
+          case 'number':
+            return 'number';
+          case 'boolean':
+            return 'checkbox';
+          default:
+            return 'text';
+        }
+      };
+
+      const getInputValue = () => {
+        const value = toolArguments[key];
+        if (prop.type === 'boolean') {
+          return value === true || value === 'true';
+        }
+        return value || '';
+      };
+
+      const handleInputChange = (e) => {
+        const newValue = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        setToolArguments(prev => ({ ...prev, [key]: newValue }));
+      };
+
+      return (
+        <div key={key} className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {key} {tool.inputSchema.required?.includes(key) && <span className="text-red-500">*</span>}
+            <span className="text-xs text-gray-500 ml-2">({prop.type})</span>
+          </label>
+          
+          {prop.type === 'boolean' ? (
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={getInputValue()}
+                onChange={handleInputChange}
+                className="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+              />
+              <span className="ml-2 text-sm text-gray-700">
+                {getInputValue() ? 'True' : 'False'}
+              </span>
+            </div>
+          ) : (
+            <input
+              type={getInputType()}
+              value={getInputValue()}
+              onChange={handleInputChange}
+              placeholder={prop.description || `Enter ${key}`}
+              step={prop.type === 'integer' ? '1' : undefined}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+            />
+          )}
+          
+          {prop.description && (
+            <div className="text-xs text-gray-500 mt-1">{prop.description}</div>
+          )}
+        </div>
+      );
+    });
   };
 
   return (
@@ -197,22 +405,78 @@ const MCPClientAdvanced = () => {
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Connection Settings</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label htmlFor="serverUrl" className="block text-sm font-medium text-gray-700 mb-2">
-              Server URL
+        {/* Connection Mode Toggle */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="connectionMode"
+                checked={useServerSelection}
+                onChange={() => setUseServerSelection(true)}
+                className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">Select from existing servers</span>
             </label>
-            <input
-              type="url"
-              id="serverUrl"
-              value={serverUrl}
-              onChange={(e) => setServerUrl(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-              placeholder="http://localhost:8016/mcp"
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="connectionMode"
+                checked={!useServerSelection}
+                onChange={() => setUseServerSelection(false)}
+                className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">Manual URL entry</span>
+            </label>
+          </div>
+        </div>
+
+        {useServerSelection ? (
+          /* Server Selection Mode */
+          <div className="mb-6">
+            <ServerTokenSelector
+              onServerTokenSelect={handleServerTokenSelect}
+              selectedServer={selectedServer}
+              selectedToken={selectedToken}
             />
           </div>
-          
-          <div>
+        ) : (
+          /* Manual URL Entry Mode */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label htmlFor="serverUrl" className="block text-sm font-medium text-gray-700 mb-2">
+                Server URL
+              </label>
+              <input
+                type="url"
+                id="serverUrl"
+                value={serverUrl}
+                onChange={(e) => setServerUrl(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                placeholder="http://localhost:8016/mcp"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="transportType" className="block text-sm font-medium text-gray-700 mb-2">
+                Transport Type
+              </label>
+              <select
+                id="transportType"
+                value={transportType}
+                onChange={(e) => setTransportType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value="streamable-http">Streamable HTTP</option>
+                <option value="sse">Server-Sent Events (SSE)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Transport Type for Server Selection Mode */}
+        {useServerSelection && (
+          <div className="mb-4">
             <label htmlFor="transportType" className="block text-sm font-medium text-gray-700 mb-2">
               Transport Type
             </label>
@@ -220,13 +484,13 @@ const MCPClientAdvanced = () => {
               id="transportType"
               value={transportType}
               onChange={(e) => setTransportType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              className="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
             >
               <option value="streamable-http">Streamable HTTP</option>
               <option value="sse">Server-Sent Events (SSE)</option>
             </select>
           </div>
-        </div>
+        )}
 
         <div className="flex items-center space-x-4">
           {needsAuth ? (
@@ -239,7 +503,7 @@ const MCPClientAdvanced = () => {
           ) : (
             <button
               onClick={handleConnect}
-              disabled={isConnecting || isConnected}
+              disabled={isConnecting || isConnected || (useServerSelection && (!selectedServer || !selectedToken)) || (!useServerSelection && !serverUrl.trim())}
               className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isConnecting ? 'Connecting...' : 'Connect'}
@@ -254,10 +518,11 @@ const MCPClientAdvanced = () => {
             Disconnect
           </button>
 
-          {error && (
+          {error && !isConnected && !isConnecting && (
             <button
               onClick={handleRetry}
-              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700"
+              disabled={isConnecting}
+              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Retry
             </button>

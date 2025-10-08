@@ -24,20 +24,7 @@ class McpConnectorTemplateItem(BaseModel):
 
 
 class McpServerToolItem(McpConnectorToolItem):
-    id: str
-    is_active: bool = Field(default=True)
-    tool_type: ToolType = Field(default=ToolType.static)
-    model_config = ConfigDict(extra="allow")
-
-    @model_validator(mode='before')
-    @classmethod
-    def update_id(cls, data: dict) -> dict:
-        data['id'] = data['name'].replace("_", "-")
-        return data
-    
-    @field_serializer('tool_type')
-    def serialize_items(self, items: ToolType) -> str:
-        return items.value
+    ...
 
 
 class McpServerTemplateItem(McpConnectorTemplateItem):
