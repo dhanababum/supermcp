@@ -151,7 +151,10 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
           "_fastmcp": {
             tags: []
           }
-        }
+        },
+        // Include template information for tracking
+        template_name: selectedTemplate?.name || null,
+        template_args: formData || {}
       };
 
       // Call the API to create the tool using servers/{server_id}/tools endpoint

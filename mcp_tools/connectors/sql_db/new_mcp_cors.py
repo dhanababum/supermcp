@@ -15,6 +15,8 @@ Notes:
 """
 import pdb
 import os
+from fastmcp.exceptions import ToolError
+from fastmcp.tools.tool import ToolResult
 import requests
 from starlette.exceptions import HTTPException
 from starlette.middleware.cors import CORSMiddleware
@@ -23,7 +25,7 @@ from pydantic import BaseModel
 import jwt
 from typing import Any, Callable, Dict, List
 from fastapi import Request
-from utils import CustomFastMCP as FastMCP
+from utils import CustomFastMCP as FastMCP, Template
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.tools import Tool
 from fastmcp.tools.tool_transform import ArgTransform, TransformedTool
@@ -33,7 +35,7 @@ from fastmcp.server.middleware.middleware import (
     Middleware, MiddlewareContext, CallNext
 )
 from starlette.responses import FileResponse, JSONResponse
-from mcp.types import Tool as MCPTool
+from mcp.types import TextContent, Tool as MCPTool
 
 from fastmcp.server.auth import RemoteAuthProvider
 
@@ -123,26 +125,16 @@ def hello_tool_x(name: str, age: int) -> str:
     """
     return f"Hello, {name}!"
 
-new_tool = Tool.from_tool(
-    hello_tool_x,
-    transform_args={
-        "name": ArgTransform(name="search_query")
-    },
-#     output_schema={
-#         "type": "object",
-#         "properties": {"status": {"type": "string"}}
-# }
-)
-
-
-mcp.add_tool(new_tool)
 
 @mcp.template("hello")
-def hello_template(name: str, age: int) -> str:
+def hello_template(name: str, age: int):
     """
     Hello template
     """
-    return f"Hello, {name}!"
+    async def dynamic_hello(**kwargs):
+        print(f"Dat: {dynamic_hello.__annotations__}")
+        return name.format(**kwargs)
+    return dynamic_hello
 
 
 # hello_tool_x.disable()
@@ -228,24 +220,84 @@ class OwnerFilterMiddleware(Middleware):
     - on_call_tool: ensure the requested tool name belongs to the caller (owner prefix match).
     """
 
+    async def on_call_tool(self, context: MiddlewareContext, call_next: CallNext):
+        print(f"On call tool................", context)
+        access_token = get_access_token()
+
+        # tool = await context.fastmcp_context.fastmcp.get_tool(tool_name)
+        server_tool = await self.get_tool_by_name(access_token.token, context.message.name)
+        
+        if server_tool and server_tool["tool_type"] == "dynamic":
+            template = mcp.get_template(server_tool["tool"]["template_name"])
+            dynamic_function = template.template_function(**server_tool["tool"]["template_args"])
+            # import pdb; pdb.set_trace()
+            result = ToolResult(
+                content=[TextContent(type="text", text=await dynamic_function(**context.message.arguments))],
+            )
+            return result
+        elif not server_tool:
+            raise ToolError(f"Access denied to private tool: {context.message.name}")
+        print(f"Context: {context}")
+        print(f"Access token: {access_token}")
+        tool = await call_next(context)
+        return tool
+
     async def on_list_tools(self, context: MiddlewareContext, call_next: CallNext):
         # Get the full list of Tool objects from the inner server
-        tools = await call_next(context)  # list[Tool]
+        # import pdb; pdb.set_trace()
+          # list[Tool]
         access_token = get_access_token()
         print(f"Context: {context}")
         print(f"Access token: {access_token}")
-        print(f"Tools: {tools}")
+        # print(f"Tools: {tools}")
         # req = requests.get("http://127.0.0.1:9000/api/")
         online_tools = await self.get_active_tools(access_token.token)
         print(f"Online tools: {online_tools}")
-        for tool in online_tools:
-            tools.append(mcp.add_tool(TransformedTool(tool)))
+        static_tools = [tool["tool"]["name"] for tool in online_tools if tool["tool_type"] == "static"]
+        tools = await call_next(context)
+        new_tools = []
+        for tool in tools:
+            if tool.name in set(static_tools):
+                new_tools.append(tool)
+        for server_tool in online_tools:
+            tool = server_tool["tool"]
+            if server_tool["tool_type"] == "dynamic":
+                template_name = server_tool["template_name"]
+                template: Template = mcp.get_template(template_name)
+                
+                new_tool = Tool(
+                    name=tool["name"],
+                    parameters=tool.get("inputSchema", {}),
+                    description=tool.get("description", ""),
+                    annotations=tool.get("annotations", {}),
+                    meta=tool.get("meta", {}),
+                )
+                
+                t_tool = TransformedTool.from_tool(
+                    new_tool,
+                    transform_fn=template.template_function(
+                        **server_tool["template_args"]),
+                    annotations=tool.get("annotations", {}),
+                    meta=tool.get("meta", {}),
+                )
+                # tool = context.fastmcp_context.fastmcp.add_tool(t_tool)
+                # context.fastmcp_context.fastmcp.add_tool(t_tool)
+                print(f"Tool: {tool}")
+                new_tools.append(t_tool)
+        
+                # import pdb; pdb.set_trace()
+        # print(f"Tools: {tools}")
         # tools = [tool for tool in tools if tool.name in online_tools]
-        return tools
+        return new_tools
     
     async def get_active_tools(self, access_token: str):
         req = requests.get("http://127.0.0.1:9000/api/tools", headers={"Authorization": f"Bearer {access_token}"})
         return req.json()
+
+    async def get_tool_by_name(self, access_token: str, tool_name: str):
+        req = requests.get(f"http://127.0.0.1:9000/api/tool?name={tool_name}", headers={"Authorization": f"Bearer {access_token}"})
+        return req.json() if req.status_code == 200 else None
+
 
 # Test getting tools (await the coroutine)
 mcp.add_middleware(OwnerFilterMiddleware())

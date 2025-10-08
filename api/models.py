@@ -99,6 +99,8 @@ class McpServerTool(SQLModel, table=True):
         description="Foreign key to the MCP server"
     )
     name: str = Field(description="The name of the tool")
+    template_name: str = Field(default=None, description="The name of the template")
+    template_args: dict = Field(default=None, sa_column=Column(JSONB), description="The template args as JSONB")
     tool: McpServerToolItem = Field(sa_column=Column(JSONB), description="The tools as JSONB")
     tool_type: ToolType = Field(description="The type of the tool")
     is_active: bool = Field(default=True, description="Whether this tool is active")

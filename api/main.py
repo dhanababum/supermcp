@@ -19,7 +19,7 @@ logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
 logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
 logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 
-from fastapi import FastAPI, APIRouter, Depends, HTTPException
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from pydantic import BaseModel
@@ -491,6 +491,8 @@ def get_database_tools(
             "description": tool.description,
             "inputSchema": tool.inputSchema if tool.inputSchema else {},
             "tool_type": tool_type_value,  # Show tool_type
+            "template_name": server_tool.template_name,
+            "template_args": server_tool.template_args,
             "is_active": server_tool.is_active
         })
 
@@ -541,6 +543,8 @@ def get_server_tools(
             "description": tool.description,
             "inputSchema": tool.inputSchema if tool.inputSchema else {},
             "tool_type": tool_type_value,  # Show tool_type
+            "template_name": server_tool.template_name,
+            "template_args": server_tool.template_args,
             "is_active": server_tool.is_active
         })
 
@@ -607,24 +611,15 @@ def delete_tool(
     session: Session = Depends(get_session)
 ) -> dict:
     """
-    Delete a tool from a server.
+    Permanently delete a tool from a server.
     Only allows deletion of dynamic tools for safety.
+    This action cannot be undone.
     """
     try:
-        # Get the server
-        server_statement = select(McpServer).where(
-            McpServer.id == server_id,
-            McpServer.is_active.is_(True)
-        )
-        server: McpServer = session.exec(server_statement).first()
-        if not server:
-            raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
-
         # Get the tool
         tool_statement = select(McpServerTool).where(
             McpServerTool.id == tool_id,
-            McpServerTool.mcp_server_id == server_id,
-            McpServerTool.is_active.is_(True)
+            McpServerTool.mcp_server_id == server_id
         )
         tool: McpServerTool = session.exec(tool_statement).first()
         if not tool:
@@ -637,18 +632,18 @@ def delete_tool(
                 detail=f"Cannot delete tool '{tool.name}'. Only dynamic tools can be deleted. This tool is of type '{tool.tool_type.value}'."
             )
 
-        # Soft delete the tool
-        tool.is_active = False
-        tool.updated_at = datetime.utcnow()
-        session.add(tool)
+        # Permanently delete the tool from database
+        tool_name = tool.name
+        tool_type = tool.tool_type.value
+        session.delete(tool)
         session.commit()
 
         return {
             "status": "deleted",
-            "message": f"Dynamic tool '{tool.name}' deleted successfully",
+            "message": f"Dynamic tool '{tool_name}' permanently deleted",
             "tool_id": tool_id,
-            "tool_name": tool.name,
-            "tool_type": tool.tool_type.value
+            "tool_name": tool_name,
+            "tool_type": tool_type
         }
 
     except HTTPException:
@@ -691,9 +686,16 @@ def create_tool_from_template(
     Create a new tool based on a connector template.
     """
     tool = McpServerToolItem(**tool_data)
+    
+    # Extract template information from tool_data if present
+    template_name = tool_data.get('template_name')
+    template_args = tool_data.get('template_args', {})
+    
     server_tool = McpServerTool(
         mcp_server_id=server_id,
         name=tool.name,
+        template_name=template_name,
+        template_args=template_args,
         tool=tool.model_dump(),
         tool_type=ToolType.dynamic.value,
         is_active=True
@@ -757,7 +759,6 @@ def get_tools(
     """
     Get all tools from database.
     """
-    print("Getting tools.................")
     server_tools = session.exec(
         select(McpServerTool).where(
             McpServerTool.mcp_server_id == token.mcp_server_id,
@@ -769,10 +770,39 @@ def get_tools(
     for server_tool in server_tools:
         tool_data = {
             'tool_type': server_tool.tool_type,
+            'template_name': server_tool.template_name,
+            'template_args': server_tool.template_args,
             'tool': server_tool.tool
         }
         tools.append(tool_data)
     return tools
+
+
+@router.get("/tool")
+def get_tool_by_name(
+    name: str = Query(default=""),
+    session: Session = Depends(get_session),
+    token: McpServerToken = Depends(get_auth_token)
+) -> Dict[str, Any]:
+    """
+    Get a tool by name from database.
+    """
+    tool = session.exec(
+        select(McpServerTool).where(
+            McpServerTool.mcp_server_id == token.mcp_server_id,
+            McpServerTool.is_active.is_(True),
+            McpServerTool.name == name
+        )).first()
+    if not tool:
+        raise HTTPException(status_code=404, detail=f"No tool found with name: {name}")
+    tool_data = {
+        'tool_type': tool.tool_type,
+        'name': tool.name,
+        'template_name': tool.template_name,
+        'template_args': tool.template_args,
+        'tool': tool.tool
+    }
+    return tool_data
 
 
 app.include_router(router)
