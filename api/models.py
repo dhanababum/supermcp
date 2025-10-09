@@ -1,10 +1,29 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from sqlalchemy import Column
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import DeclarativeBase
 from sqlmodel import Field, SQLModel, Relationship
 from datatypes import McpConnectorToolItem, McpConnectorTemplateItem, McpServerToolItem
 from datatypes import ToolType
+
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
+from sqlalchemy import Column, String, Boolean, DateTime, Table
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.declarative import declarative_base
+import uuid
+
+# Create a separate declarative base for the User model
+UserBase = declarative_base()
+
+class User(SQLAlchemyBaseUserTableUUID, UserBase):
+    __tablename__ = "user"
+    
+    # Relationships to other models
+    connectors: List["McpConnector"] = Relationship(back_populates="user")
+    servers: List["McpServer"] = Relationship(back_populates="user")
+    server_tokens: List["McpServerToken"] = Relationship(back_populates="user")
+    server_tools: List["McpServerTool"] = Relationship(back_populates="user")
 
 
 class McpConnector(SQLModel, table=True):
@@ -15,6 +34,11 @@ class McpConnector(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
+        description="Foreign key to the user who owns this connector"
+    )
     name: str = Field(description="The connector name (e.g., 'sql_db')")
     url: str = Field(description="The connector URL")
     description: str = Field(description="The connector description")
@@ -27,6 +51,9 @@ class McpConnector(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, description="When the connector was created")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the connector was last updated")
     is_active: bool = Field(default=True, description="Whether this connector is active")
+    
+    # Many-to-one relationship: many connectors belong to one user
+    # user: Optional[User] = Relationship(back_populates="connectors")  # Temporarily disabled due to FK issues
 
     class Config:
         arbitrary_types_allowed = True
@@ -41,6 +68,11 @@ class McpServer(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
+        description="Foreign key to the user who owns this server"
+    )
     connector_id: str = Field(description="The connector id (e.g., 'sql_db')")
     server_name: str = Field(description="The human-readable server name")
     server_url: Optional[str] = Field(default=None, description="The MCP server URL for connections")
@@ -48,6 +80,10 @@ class McpServer(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, description="When the server was created")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the server was last updated")
     is_active: bool = Field(default=True, description="Whether this server is active")
+    
+    # Many-to-one relationship: many servers belong to one user
+    # user: Optional[User] = Relationship(back_populates="servers")  # Temporarily disabled due to FK issues
+    
     # One-to-many relationship: one server has many tokens
     tokens: List["McpServerToken"] = Relationship(back_populates="server")
 
@@ -67,6 +103,11 @@ class McpServerToken(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
+        description="Foreign key to the user who owns this token"
+    )
     token: str = Field(description="The token for the MCP server")
     mcp_server_id: Optional[int] = Field(
         default=None,
@@ -78,6 +119,9 @@ class McpServerToken(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the token was last updated")
     is_active: bool = Field(default=True, description="Whether this token is active")
 
+    # Many-to-one relationship: many tokens belong to one user
+    # user: Optional[User] = Relationship(back_populates="server_tokens")  # Temporarily disabled due to FK issues
+    
     # Many-to-one relationship: many tokens belong to one server
     server: Optional[McpServer] = Relationship(back_populates="tokens")
 
@@ -93,6 +137,11 @@ class McpServerTool(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
+        description="Foreign key to the user who owns this tool"
+    )
     mcp_server_id: Optional[int] = Field(
         default=None,
         foreign_key="mcp_servers.id",
@@ -106,6 +155,10 @@ class McpServerTool(SQLModel, table=True):
     is_active: bool = Field(default=True, description="Whether this tool is active")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="When the tool was created")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the tool was last updated")
+    
+    # Many-to-one relationship: many tools belong to one user
+    # user: Optional[User] = Relationship(back_populates="server_tools")  # Temporarily disabled due to FK issues
+    
     # Many-to-one relationship: many tools belong to one server
     server: Optional[McpServer] = Relationship(back_populates="server_tools")
 

@@ -46,3 +46,5 @@ export const MCPClientIcon = () => (
   </svg>
 );
 
+export { default as SuperMCPIcon } from './SuperMCPIcon';
+

@@ -2,12 +2,17 @@ import os
 import logging
 from sqlmodel import create_engine, Session
 from typing import Generator
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from collections.abc import AsyncGenerator
 
 # Get database URL from environment variable or use default
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:mysecretpassword@localhost:5432/forge_mcptools"
 )
+
+# Async database URL for fastapi_users
+ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 # Disable SQLAlchemy logging
 logging.getLogger('sqlalchemy').setLevel(logging.WARNING)
@@ -22,6 +27,22 @@ engine = create_engine(
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=5,
     max_overflow=10
+)
+
+# Create async engine for fastapi_users
+async_engine = create_async_engine(
+    ASYNC_DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10
+)
+
+# Create async session maker
+async_session_maker = async_sessionmaker(
+    async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False
 )
 
 
@@ -44,3 +65,7 @@ def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
 
+
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session

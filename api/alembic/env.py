@@ -15,6 +15,21 @@ from sqlmodel import SQLModel
 # Import models to register them with SQLModel metadata
 import models  # This will register all models with SQLModel.metadata
 
+# Import User model and add it to metadata
+from models import User, UserBase
+from sqlalchemy import MetaData
+
+# Create a combined metadata that includes both SQLModel and User table
+combined_metadata = MetaData()
+
+# Copy tables from SQLModel metadata
+for table in SQLModel.metadata.tables.values():
+    table.tometadata(combined_metadata)
+
+# Copy tables from UserBase metadata (which includes the User table)
+for table in UserBase.metadata.tables.values():
+    table.tometadata(combined_metadata)
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -31,8 +46,8 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# Use SQLModel metadata to detect all models
-target_metadata = SQLModel.metadata
+# Use combined metadata to detect all models
+target_metadata = combined_metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

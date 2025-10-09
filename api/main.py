@@ -2,12 +2,15 @@ from ast import Dict
 import sys
 import secrets
 import logging
+import uuid
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List
 import requests
 
-from datatypes import McpConnectorToolItem, McpServerToolItem, ToolType, McpConnectorTemplateItem
+from datatypes import McpServerToolItem, ToolType, McpConnectorTemplateItem
+from datatypes import UserCreate, UserRead, UserUpdate
+from users import jwt_auth_backend, cookie_auth_backend, current_active_user, fastapi_users
 
 # Add parent directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,7 +26,7 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from pydantic import BaseModel
-from models import McpConnector, McpServer, McpServerToken, McpServerTool
+from models import McpConnector, McpServer, McpServerToken, McpServerTool, User
 from database import get_session
 from utils import store_logo, get_tool_id
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -76,7 +79,9 @@ def get_all_connectors(session: Session):
     return connectors
 
 
-def create_connector_record(connector_data: dict, session: Session):
+def create_connector_record(connector_data: dict, session: Session, user_id: uuid.UUID = None):
+    if user_id:
+        connector_data["user_id"] = user_id
     connector = McpConnector(**connector_data)
     session.add(connector)
     session.commit()
@@ -107,6 +112,38 @@ router = APIRouter(
     prefix="/api",
 )
 
+app.include_router(
+    fastapi_users.get_auth_router(jwt_auth_backend), prefix="/auth/jwt", tags=["auth"]
+)
+app.include_router(
+    fastapi_users.get_auth_router(cookie_auth_backend), prefix="/auth/cookie", tags=["auth"]
+)
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_reset_password_router(),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_verify_router(UserRead),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/users",
+    tags=["users"],
+)
+
+
+@app.get("/authenticated-route")
+async def authenticated_route(user: User = Depends(current_active_user)):
+    return {"message": f"Hello {user.email}!"}
+
 
 @router.get("/")
 def read_root():
@@ -114,13 +151,48 @@ def read_root():
 
 
 @router.get("/connectors")
-def get_connectors(session: Session = Depends(get_session)) -> list:
-    connectors = session.exec(select(McpConnector)).all()
-    return connectors
+def get_connectors(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(current_active_user)
+) -> list:
+    print(f"Current user: {current_user}")
+    print(f"Current user ID: {current_user.id}")
+    print(f"Current user type: {type(current_user.id)}")
+    
+    try:
+        # Query connectors directly by user_id without using the relationship
+        connectors = session.exec(
+            select(McpConnector).where(McpConnector.user_id == current_user.id)
+        ).all()
+        print(f"Found {len(connectors)} connectors")
+        
+        # Convert to dict to avoid relationship serialization issues
+        result = []
+        for connector in connectors:
+            result.append({
+                "id": connector.id,
+                "name": connector.name,
+                "url": connector.url,
+                "description": connector.description,
+                "version": connector.version,
+                "logo_url": connector.logo_url,
+                "created_at": connector.created_at.isoformat() if connector.created_at else None,
+                "updated_at": connector.updated_at.isoformat() if connector.updated_at else None,
+                "is_active": connector.is_active
+            })
+        
+        return result
+    except Exception as e:
+        print(f"Error in get_connectors: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @router.post("/connectors")
-def create_connector(request: CreateConnectorRequest, session: Session = Depends(get_session)) -> dict:
+def create_connector(
+    request: CreateConnectorRequest, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(current_active_user)
+) -> dict:
     req = requests.get(request.connector_url)
     if req.status_code != 200:
         raise HTTPException(status_code=400, detail="Failed to get connector schema")
@@ -151,7 +223,7 @@ def create_connector(request: CreateConnectorRequest, session: Session = Depends
         "templates_config": templates,
         "server_config": server_config
     }
-    data = create_connector_record(connector_data, session)
+    data = create_connector_record(connector_data, session, current_user.id)
     logo_url = connector_data.get("logo_url", "")
     if logo_url and logo_url.strip():
         try:
@@ -187,7 +259,8 @@ def get_connector_schema_endpoint(connector_id: int, session: Session = Depends(
 @router.post("/servers")
 def create_server(
     server_data: dict,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(current_active_user)
 ) -> dict:
     # Ensure connector_id and server_name are provided
     if "server_name" not in server_data:
@@ -213,7 +286,7 @@ def create_server(
     
     connector_id = server_data.pop("connector_id")
     
-    mcp_server = McpServer(**server_data, connector_id=connector_id)
+    mcp_server = McpServer(**server_data, connector_id=connector_id, user_id=current_user.id)
     session.add(mcp_server)
     session.commit()
     session.refresh(mcp_server)
@@ -228,6 +301,7 @@ def create_server(
         tool = McpServerToolItem(**tool)
         server_tool = McpServerTool(
             mcp_server_id=mcp_server.id,
+            user_id=current_user.id,
             name=tool.name,
             tool=tool.model_dump(),
             tool_type=ToolType.static.value,
@@ -241,6 +315,7 @@ def create_server(
     token = McpServerToken(
         token=token_value,
         mcp_server_id=mcp_server.id,
+        user_id=current_user.id,
         expires_at=token_expires_at
     )
     session.add(token)
@@ -260,13 +335,15 @@ def create_server(
 
 @router.get("/servers")
 def list_all_servers(
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(current_active_user)
 ) -> List[dict]:
     """
     List all active server configurations.
     """
     statement = select(McpServer).where(
-        McpServer.is_active.is_(True)
+        McpServer.is_active.is_(True),
+        McpServer.user_id == current_user.id
     ).order_by(McpServer.updated_at.desc())
     
     configs = session.exec(statement).all()
@@ -507,7 +584,8 @@ def get_database_tools(
 @router.get("/servers/{server_id}/tools")
 def get_server_tools(
     server_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(current_active_user)
 ) -> dict:
     """
     Retrieve tools from database with tool_type information.
@@ -515,7 +593,8 @@ def get_server_tools(
     # Get the server configuration
     statement = select(McpServer).where(
         McpServer.id == server_id,
-        McpServer.is_active.is_(True)
+        McpServer.is_active.is_(True),
+        McpServer.user_id == current_user.id
     )
     server: McpServer = session.exec(statement).first()
     if not server:
@@ -810,4 +889,4 @@ app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+    uvicorn.run("main:app", host="0.0.0.0", port=9000, reload=True)

@@ -1,18 +1,49 @@
 import React from 'react';
-import { MenuIcon, InfoIcon, ChevronRightIcon } from '../icons';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { MenuIcon, InfoIcon, ChevronRightIcon, SuperMCPIcon } from '../icons';
 import { navigationItems } from '../../constants/navigation';
 
-const Sidebar = ({ collapsed, onToggleCollapse, currentRoute, onRouteChange }) => {
+const Sidebar = ({ collapsed, onToggleCollapse }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Get current route from location
+  const getCurrentRoute = () => {
+    const path = location.pathname;
+    if (path.startsWith('/servers/')) return 'servers';
+    if (path.startsWith('/server-tools')) return 'server-tools';
+    if (path.startsWith('/connectors')) return 'connectors';
+    if (path.startsWith('/mcp-client')) return 'mcp-client';
+    if (path.startsWith('/oauth/callback')) return 'oauth-callback';
+    return 'dashboard';
+  };
+  
+  const currentRoute = getCurrentRoute();
+  
+  const handleLogout = async () => {
+    try {
+      await fetch('http://localhost:9000/auth/cookie/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      navigate('/auth/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      navigate('/auth/login');
+    }
+  };
   return (
     <div className={`${collapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}>
       {/* Logo and Toggle */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        {!collapsed && (
+        {!collapsed ? (
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold text-sm">
-              C
-            </div>
-            <span className="font-semibold text-lg">Cake.</span>
+            <SuperMCPIcon className="w-8 h-8" />
+            <span className="font-semibold text-lg">SuperMCP</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center w-full">
+            <SuperMCPIcon className="w-8 h-8" />
           </div>
         )}
         <button
@@ -27,9 +58,9 @@ const Sidebar = ({ collapsed, onToggleCollapse, currentRoute, onRouteChange }) =
       <nav className="flex-1 p-3 overflow-y-auto">
         <div className="space-y-1">
           {navigationItems.map((item) => (
-            <button
+            <Link
               key={item.id}
-              onClick={() => onRouteChange(item.route)}
+              to={`/${item.route}`}
               className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-3 py-2 rounded-lg text-sm transition-colors ${
                 currentRoute === item.route
                   ? 'bg-purple-50 text-purple-600'
@@ -46,10 +77,24 @@ const Sidebar = ({ collapsed, onToggleCollapse, currentRoute, onRouteChange }) =
               {!collapsed && item.hasSubmenu && (
                 <ChevronRightIcon />
               )}
-            </button>
+            </Link>
           ))}
         </div>
       </nav>
+
+      {/* Logout Button */}
+      <div className="p-3 border-t border-gray-200">
+        <button
+          onClick={handleLogout}
+          className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start'} px-3 py-2 rounded-lg text-sm transition-colors text-red-600 hover:bg-red-50`}
+          title={collapsed ? 'Logout' : ''}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          {!collapsed && <span className="ml-3">Logout</span>}
+        </button>
+      </div>
 
       {/* What's New Section */}
       {!collapsed && (

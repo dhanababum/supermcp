@@ -1,7 +1,7 @@
-from typing import Any
+import uuid
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
-from typing_extensions import Self
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from fastapi_users import schemas
 
 
 class ToolType(Enum):
@@ -37,3 +37,15 @@ class McpServerTemplateItem(McpConnectorTemplateItem):
     def update_id(cls, data: dict) -> dict:
         data['id'] = data['name'].replace("_", "-")
         return data
+
+
+class UserRead(schemas.BaseUser[uuid.UUID]):
+    ...
+
+
+class UserCreate(schemas.BaseUserCreate):
+    ...
+
+
+class UserUpdate(schemas.BaseUserUpdate):
+    ...

@@ -16,7 +16,7 @@ const Banner = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
           </div>
-          <span className="text-purple-900 font-medium">Have your say on the new Cake Dashboard</span>
+          <span className="text-purple-900 font-medium">Welcome to SuperMCP - Your MCP Tools Dashboard</span>
         </div>
         <div className="flex items-center space-x-3">
           <button className="px-4 py-2 bg-purple-200 text-purple-900 text-sm font-medium rounded-lg hover:bg-purple-300">
