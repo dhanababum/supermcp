@@ -47,7 +47,7 @@ bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 cookie_transport = CookieTransport(
     cookie_name="auth_cookie", 
     cookie_max_age=3600,
-    cookie_secure=False,  # Allow cookies over HTTP in development
+    cookie_secure=True,  # Allow cookies over HTTP in development
     cookie_httponly=True,
     cookie_samesite="lax"
 )

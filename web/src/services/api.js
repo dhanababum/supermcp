@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:9000';
+const IGNORE_REDIRECT_ENDPOINTS = ['/auth/cookie/login', '/auth/logout', '/users/me'];
 const API_ROUTES = {
   // Auth endpoints
   login: '/auth/cookie/login',
@@ -59,7 +60,9 @@ const apiRequest = async (endpoint, options = {}) => {
     if (!response.ok) {
       // Handle 401 Unauthorized
       if (response.status === 401) {
-        window.location.href = '/auth/login';
+        if (!IGNORE_REDIRECT_ENDPOINTS.includes(endpoint)) {
+          window.location.href = '/auth/login';
+        }
         throw new Error('Unauthorized - redirecting to login');
       }
       

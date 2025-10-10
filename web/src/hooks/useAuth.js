@@ -8,55 +8,6 @@ export const useAuth = () => {
   const [user, setUser] = useState(null);
   const isCheckingRef = useRef(false); // Prevent multiple simultaneous checks
 
-  const checkAuthStatus = useCallback(async () => {
-    // Prevent multiple simultaneous auth checks
-    if (isCheckingRef.current) {
-      console.log('Auth check already in progress, skipping...');
-      return;
-    }
-
-    try {
-      isCheckingRef.current = true;
-      setIsLoading(true);
-      
-      // First check if we have auth cookies
-      if (!authCookies.hasAuthCookies()) {
-        setIsAuthenticated(false);
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
-
-      // Verify with server and fetch user data in one call
-      // This combines auth check + user data fetch
-      console.log('Checking auth status with /users/me...');
-      const response = await fetch('http://localhost:9000/users/me', {
-        credentials: 'include',
-      });
-      
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-        setIsAuthenticated(true);
-        console.log('Auth check successful, user:', userData.email);
-      } else {
-        setIsAuthenticated(false);
-        setUser(null);
-        // Clear invalid auth cookies
-        authCookies.clearAuth();
-        console.log('Auth check failed, status:', response.status);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      authCookies.clearAuth();
-    } finally {
-      setIsLoading(false);
-      isCheckingRef.current = false;
-    }
-  }, []);
-
   const login = useCallback(async (credentials) => {
     try {
       setIsLoading(true);
@@ -71,7 +22,7 @@ export const useAuth = () => {
       });
 
       if (response.ok) {
-        await checkAuthStatus();
+        // await checkAuthStatus();
         return { success: true };
       } else {
         const error = await response.json();
@@ -83,7 +34,7 @@ export const useAuth = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [checkAuthStatus]);
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -109,6 +60,6 @@ export const useAuth = () => {
     user,
     login,
     logout,
-    checkAuthStatus,
+    // checkAuthStatus,
   };
 };

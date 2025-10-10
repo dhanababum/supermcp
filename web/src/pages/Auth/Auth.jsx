@@ -12,6 +12,27 @@ const Auth = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLogin, setIsLogin] = useState(true);
 
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch('http://localhost:9000/users/me', {
+          credentials: 'include', // Include cookies
+        });
+        
+        if (response.ok) {
+          // User is already authenticated, redirect to dashboard
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        // User is not authenticated, stay on auth page
+        console.log('User not authenticated');
+      }
+    };
+    
+    checkAuthStatus();
+  }, [navigate]);
+
   // Update form type based on URL
   useEffect(() => {
     const path = location.pathname;
@@ -57,7 +78,7 @@ const Auth = () => {
         // window.dispatchEvent(new Event('auth:refresh'));
         
         // Wait a moment for the auth state to update before navigating
-        navigate('/dashboard', { replace: true });
+         navigate('/dashboard', { replace: true });
       } else {
         // Only try to parse JSON on error responses
         const contentType = response.headers.get('content-type');

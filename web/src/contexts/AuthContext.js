@@ -31,52 +31,35 @@ export const AuthProvider = ({ children }) => {
 
     try {
       console.log('Checking auth status, cookies present:', authCookies.hasAuthCookies && authCookies.hasAuthCookies());
-
+      try {
+        const result = await api.getMe();
+        if (!result) {
+          setIsAuthenticated(false);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        } else {
+          setIsAuthenticated(true);
+          setUser(result);
+          setIsLoading(false);
+          console.log('result: Authenticated', result);
+          return;
+        }
+      } catch (error) {
+        console.log('error', error);
+      }
+      // console.log('result', result);
       // If you want to short-circuit when no cookies exist, uncomment:
-      // if (!authCookies.hasAuthCookies()) {
-      //   if (isMountedRef.current) {
-      //     setIsAuthenticated(false);
-      //     setUser(null);
-      //     setIsLoading(false);
-      //   }
-      //   return;
-      // }
+        
+      
 
       // Defensive handling for different api implementations:
       // - api.getMe() might throw on 401
       // - or it might return { ok: true, data: user } / { ok: false, error }
-      const result = await api.getMe();
+      // const result = await api.getMe();
 
       // If api.getMe returns an object with ok/data:
-      if (result && typeof result === 'object' && 'ok' in result) {
-        if (result.ok) {
-          if (isMountedRef.current) {
-            setUser(result.data ?? null);
-            setIsAuthenticated(true);
-          }
-        } else {
-          // failed validation
-          if (isMountedRef.current) {
-            setIsAuthenticated(false);
-            setUser(null);
-            authCookies.clearAuth();
-          }
-        }
-      } else {
-        // If it returns user directly (or throws), treat result as user
-        if (result) {
-          if (isMountedRef.current) {
-            setUser(result);
-            setIsAuthenticated(true);
-          }
-        } else {
-          if (isMountedRef.current) {
-            setIsAuthenticated(false);
-            setUser(null);
-            authCookies.clearAuth();
-          }
-        }
-      }
+      
     } catch (err) {
       console.warn('Auth verification failed:', err?.message ?? err);
       if (isMountedRef.current) {

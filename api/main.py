@@ -161,9 +161,7 @@ def get_connectors(
     
     try:
         # Query connectors directly by user_id without using the relationship
-        connectors = session.exec(
-            select(McpConnector).where(McpConnector.user_id == current_user.id)
-        ).all()
+        connectors = get_all_connectors(session)
         print(f"Found {len(connectors)} connectors")
         
         # Convert to dict to avoid relationship serialization issues
