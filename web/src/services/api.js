@@ -129,8 +129,49 @@ export const api = {
     return apiRequest(API_ROUTES.connectors);
   },
 
+  createConnector: async (connectorData) => {
+    return apiRequest(API_ROUTES.connectors, {
+      method: 'POST',
+      body: JSON.stringify(connectorData),
+    });
+  },
+
   getConnectorSchema: async (connectorId) => {
     return apiRequest(API_ROUTES.connectorSchema(connectorId));
+  },
+
+  // Connector Access Management (Superuser only)
+  grantConnectorAccess: async (userId, connectorId) => {
+    return apiRequest('/api/connectors/grant-access', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        connector_id: connectorId,
+      }),
+    });
+  },
+
+  revokeConnectorAccess: async (userId, connectorId) => {
+    return apiRequest('/api/connectors/revoke-access', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        connector_id: connectorId,
+      }),
+    });
+  },
+
+  getConnectorAccess: async (connectorId) => {
+    return apiRequest(`/api/connectors/${connectorId}/access`);
+  },
+
+  // User Management (Superuser only)
+  searchUsers: async (query) => {
+    return apiRequest(`/api/users/search?q=${encodeURIComponent(query)}`);
+  },
+
+  getAllUsers: async () => {
+    return apiRequest('/api/users');
   },
 
   // Servers
@@ -154,6 +195,11 @@ export const api = {
   // Server Tools
   getServerTools: async (serverId) => {
     return apiRequest(API_ROUTES.serverTools(serverId));
+  },
+
+  // Server Tokens
+  getServerTokens: async (serverId) => {
+    return apiRequest(`/api/servers/${serverId}/tokens`);
   },
 };
 

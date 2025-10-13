@@ -10,20 +10,23 @@ from datatypes import ToolType
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import Column, String, Boolean, DateTime, Table
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
 import uuid
 
 # Create a separate declarative base for the User model
+from sqlalchemy.ext.declarative import declarative_base
 UserBase = declarative_base()
 
 class User(SQLAlchemyBaseUserTableUUID, UserBase):
     __tablename__ = "user"
     
-    # Relationships to other models
-    connectors: List["McpConnector"] = Relationship(back_populates="user")
-    servers: List["McpServer"] = Relationship(back_populates="user")
-    server_tokens: List["McpServerToken"] = Relationship(back_populates="user")
-    server_tools: List["McpServerTool"] = Relationship(back_populates="user")
+    # fastapi-users already provides is_superuser field
+    # No need to add custom role field - use the built-in is_superuser
+    
+    # Relationships to other models (disabled due to mixed base classes)
+    # connectors: List["McpConnector"] = Relationship(back_populates="user")
+    # servers: List["McpServer"] = Relationship(back_populates="user")
+    # server_tokens: List["McpServerToken"] = Relationship(back_populates="user")
+    # server_tools: List["McpServerTool"] = Relationship(back_populates="user")
 
 
 class McpConnector(SQLModel, table=True):
@@ -34,10 +37,10 @@ class McpConnector(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[uuid.UUID] = Field(
+    created_by: Optional[uuid.UUID] = Field(
         default=None,
-        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
-        description="Foreign key to the user who owns this connector"
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('user.id', use_alter=True)),
+        description="Foreign key to the superuser who created this connector"
     )
     name: str = Field(description="The connector name (e.g., 'sql_db')")
     url: str = Field(description="The connector URL")
@@ -52,8 +55,43 @@ class McpConnector(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the connector was last updated")
     is_active: bool = Field(default=True, description="Whether this connector is active")
     
-    # Many-to-one relationship: many connectors belong to one user
-    # user: Optional[User] = Relationship(back_populates="connectors")  # Temporarily disabled due to FK issues
+    # One-to-many relationship: one connector has many access records
+    access_records: List["ConnectorAccess"] = Relationship(back_populates="connector")
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class ConnectorAccess(SQLModel, table=True):
+    """
+    Model for managing user access to connectors.
+    Only superusers can grant access to connectors.
+    """
+    __tablename__ = "connector_access"
+    __table_args__ = {"extend_existing": True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    connector_id: Optional[int] = Field(
+        default=None,
+        foreign_key="mcp_connectors.id",
+        description="Foreign key to the connector"
+    )
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('user.id', use_alter=True)),
+        description="Foreign key to the user who has access"
+    )
+    granted_by: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('user.id', use_alter=True)),
+        description="Foreign key to the superuser who granted access"
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="When access was granted")
+    updated_at: datetime = Field(default_factory=datetime.utcnow, description="When access was last updated")
+    is_active: bool = Field(default=True, description="Whether this access is active")
+    
+    # Many-to-one relationship: many access records belong to one connector
+    connector: Optional[McpConnector] = Relationship(back_populates="access_records")
 
     class Config:
         arbitrary_types_allowed = True
@@ -70,7 +108,7 @@ class McpServer(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[uuid.UUID] = Field(
         default=None,
-        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('user.id', use_alter=True)),
         description="Foreign key to the user who owns this server"
     )
     connector_id: str = Field(description="The connector id (e.g., 'sql_db')")
@@ -82,7 +120,7 @@ class McpServer(SQLModel, table=True):
     is_active: bool = Field(default=True, description="Whether this server is active")
     
     # Many-to-one relationship: many servers belong to one user
-    # user: Optional[User] = Relationship(back_populates="servers")  # Temporarily disabled due to FK issues
+    # user: Optional[User] = Relationship(back_populates="servers")  # Disabled due to mixed base classes
     
     # One-to-many relationship: one server has many tokens
     tokens: List["McpServerToken"] = Relationship(back_populates="server")
@@ -105,7 +143,7 @@ class McpServerToken(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[uuid.UUID] = Field(
         default=None,
-        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('user.id', use_alter=True)),
         description="Foreign key to the user who owns this token"
     )
     token: str = Field(description="The token for the MCP server")
@@ -120,7 +158,7 @@ class McpServerToken(SQLModel, table=True):
     is_active: bool = Field(default=True, description="Whether this token is active")
 
     # Many-to-one relationship: many tokens belong to one user
-    # user: Optional[User] = Relationship(back_populates="server_tokens")  # Temporarily disabled due to FK issues
+    # user: Optional[User] = Relationship(back_populates="server_tokens")  # Disabled due to mixed base classes
     
     # Many-to-one relationship: many tokens belong to one server
     server: Optional[McpServer] = Relationship(back_populates="tokens")
@@ -139,7 +177,7 @@ class McpServerTool(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[uuid.UUID] = Field(
         default=None,
-        sa_column=Column(UUID(as_uuid=True), ForeignKey('"user".id')),
+        sa_column=Column(UUID(as_uuid=True), ForeignKey('user.id', use_alter=True)),
         description="Foreign key to the user who owns this tool"
     )
     mcp_server_id: Optional[int] = Field(
@@ -148,8 +186,8 @@ class McpServerTool(SQLModel, table=True):
         description="Foreign key to the MCP server"
     )
     name: str = Field(description="The name of the tool")
-    template_name: str = Field(default=None, description="The name of the template")
-    template_args: dict = Field(default=None, sa_column=Column(JSONB), description="The template args as JSONB")
+    template_name: Optional[str] = Field(default=None, sa_column=Column(String, nullable=True), description="The name of the template")
+    template_args: Optional[dict] = Field(default=None, sa_column=Column(JSONB, nullable=True), description="The template args as JSONB")
     tool: McpServerToolItem = Field(sa_column=Column(JSONB), description="The tools as JSONB")
     tool_type: ToolType = Field(description="The type of the tool")
     is_active: bool = Field(default=True, description="Whether this tool is active")
@@ -157,7 +195,7 @@ class McpServerTool(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the tool was last updated")
     
     # Many-to-one relationship: many tools belong to one user
-    # user: Optional[User] = Relationship(back_populates="server_tools")  # Temporarily disabled due to FK issues
+    # user: Optional[User] = Relationship(back_populates="server_tools")  # Disabled due to mixed base classes
     
     # Many-to-one relationship: many tools belong to one server
     server: Optional[McpServer] = Relationship(back_populates="server_tools")

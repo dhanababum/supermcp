@@ -10,7 +10,7 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
   // Get current route from location
   const getCurrentRoute = () => {
     const path = location.pathname;
-    if (path.startsWith('/servers/')) return 'servers';
+    if (path.startsWith('/servers') || path === '/servers') return 'servers';
     if (path.startsWith('/server-tools')) return 'server-tools';
     if (path.startsWith('/connectors')) return 'connectors';
     if (path.startsWith('/mcp-client')) return 'mcp-client';

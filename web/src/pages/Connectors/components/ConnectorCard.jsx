@@ -1,6 +1,9 @@
 import React from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
+import SuperuserActions from './SuperuserActions';
 
 const ConnectorCard = ({ connector, onConfigure }) => {
+  const { isSuperuser } = useAuth();
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between mb-4">
@@ -43,13 +46,19 @@ const ConnectorCard = ({ connector, onConfigure }) => {
             Create Server
           </button>
         </div>
-        <div className="flex items-center justify-center">
-          <button className="px-3 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-          </button>
-        </div>
+        
+        {/* Superuser Actions */}
+        {isSuperuser() && (
+          <div className="pt-2 border-t border-gray-100">
+            <SuperuserActions 
+              connector={connector} 
+              onAccessUpdate={() => {
+                // Handle access updates if needed
+                console.log('Access updated for connector:', connector.id);
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

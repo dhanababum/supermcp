@@ -30,7 +30,7 @@ const MCPClientAdvanced = () => {
     authenticate,
     retry,
     clearStorage
-  } = useMCPClient(serverUrl, transportType, selectedToken?.token);
+  } = useMCPClient(serverUrl, transportType, selectedToken?.token) || {};
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,10 +63,15 @@ const MCPClientAdvanced = () => {
     setConnectionAttempted(false); // Reset connection attempt flag
     
     // Use the server_url from the server data, or fallback to a default
-    const serverUrl = server.server_url || `http://localhost:8016/mcp`;
+    const serverUrl = (typeof server.server_url === 'string' && server.server_url.trim()) 
+      ? server.server_url.trim() 
+      : `http://localhost:8016/mcp`;
     setServerUrl(serverUrl);
     
-    addMessage('system', `Selected server: ${server.server_name} with token: ${token.token.substring(0, 20)}...`);
+    const tokenPreview = token && typeof token.token === 'string' 
+      ? token.token.substring(0, 20) + '...' 
+      : 'invalid token';
+    addMessage('system', `Selected server: ${server.server_name} with token: ${tokenPreview}`);
     addMessage('system', `Server URL set to: ${serverUrl}`);
     addMessage('system', 'Click Connect to establish connection with the new server');
   };
@@ -79,12 +84,15 @@ const MCPClientAdvanced = () => {
 
   // Debug selectedToken changes
   useEffect(() => {
-    console.log('selectedToken changed:', selectedToken ? `${selectedToken.token.substring(0, 20)}...` : 'null');
+    const tokenPreview = selectedToken && typeof selectedToken.token === 'string' 
+      ? `${selectedToken.token.substring(0, 20)}...` 
+      : 'null';
+    console.log('selectedToken changed:', tokenPreview);
   }, [selectedToken]);
 
   // Update available tools when they change from the hook
   useEffect(() => {
-    if (availableToolsFromHook && availableToolsFromHook.length > 0) {
+    if (availableToolsFromHook && Array.isArray(availableToolsFromHook) && availableToolsFromHook.length > 0) {
       setAvailableTools(availableToolsFromHook);
       addMessage('system', `Loaded ${availableToolsFromHook.length} available tools`);
     }
@@ -550,13 +558,13 @@ const MCPClientAdvanced = () => {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Tools</h2>
           
-          {availableTools.length === 0 ? (
+          {!availableTools || availableTools.length === 0 ? (
             <div className="text-center text-gray-500 py-8">
               {isConnected ? 'No tools available' : 'Connect to a server to see available tools'}
             </div>
           ) : (
             <div className="space-y-2 mb-4">
-              {availableTools.map((tool, index) => (
+              {(availableTools || []).map((tool, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedTool(tool)}
@@ -594,12 +602,12 @@ const MCPClientAdvanced = () => {
           
           {/* Messages */}
           <div className="h-96 overflow-y-auto border border-gray-200 rounded-md p-4 mb-4 bg-gray-50">
-            {messages.length === 0 ? (
+            {!messages || messages.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
                 No messages yet. Connect to a server and start communicating.
               </div>
             ) : (
-              messages.map((message, index) => (
+              (messages || []).map((message, index) => (
                 <div key={index} className={`mb-3 ${
                   message.type === 'user' ? 'text-right' : 
                   message.type === 'error' ? 'text-red-600' : 'text-left'

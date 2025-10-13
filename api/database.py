@@ -29,6 +29,25 @@ engine = create_engine(
     max_overflow=10
 )
 
+# Ensure both metadata are available to the engine
+def _ensure_metadata():
+    """Ensure both SQLModel and User metadata are available to the engine."""
+    from models import UserBase
+    from sqlmodel import SQLModel
+    
+    # Use reflection to get the engine's metadata
+    from sqlalchemy import MetaData
+    metadata = MetaData()
+    metadata.reflect(bind=engine)
+    
+    # Add User metadata to the reflected metadata
+    for table in UserBase.metadata.tables.values():
+        if table.name not in metadata.tables:
+            metadata.tables[table.name] = table
+
+# Call this function to ensure metadata is available
+_ensure_metadata()
+
 # Create async engine for fastapi_users
 async_engine = create_async_engine(
     ASYNC_DATABASE_URL,
@@ -62,6 +81,7 @@ def get_session() -> Generator[Session, None, None]:
     Dependency function to get database session.
     Use this in FastAPI endpoints with Depends().
     """
+    # Use the standard SQLModel session - the foreign key constraints are already in the database
     with Session(engine) as session:
         yield session
 

@@ -25,7 +25,7 @@ from pydantic import BaseModel
 import jwt
 from typing import Any, Callable, Dict, List
 from fastapi import Request
-from utils import CustomFastMCP as FastMCP, Template
+from sql_db.utils import CustomFastMCP as FastMCP, Template
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.tools import Tool
 from fastmcp.tools.tool_transform import ArgTransform, TransformedTool
@@ -136,34 +136,6 @@ def hello_template(name: str, age: int):
         return name.format(**kwargs)
     return dynamic_hello
 
-
-# hello_tool_x.disable()
-# ---------- Helper: register a demo tool for an owner
-# We'll name each tool: "<owner>__<short_name>" so middleware can filter on owner prefix.
-def register_owner_tool(owner: str, short_name: str,
-                       fn: Callable[..., Any],
-                       description: str | None = None):
-    tool_name = f"{owner}__{short_name}"
-    # FastMCP's add_tool / tool decorator will register the callable as a tool.
-    # Prefer using mcp.add_tool if available; else fall back to decorator.
-    wrapped = fn
-    # use mcp.tool to register (this will register by function __name__ normally; to be safe we set __name__)
-    wrapped.__name__ = tool_name
-    mcp.tool(wrapped)
-
-# ---------- Demo tool implementations (simple)
-def make_echo_tool(owner: str, short_name: str):
-    async def echo(payload: dict) -> dict:
-        # just return the payload and the owner info
-        return {"owner": owner, "name": short_name, "payload": payload}
-    return echo
-
-def make_info_tool(owner: str, short_name: str):
-    def info() -> dict:
-        return {"owner": owner, "name": short_name, "msg": f"static info from {owner}/{short_name}"}
-    return info
-
-# Register some demo tools for the JWT test user
 
 @mcp.custom_route("/logo.png", methods=["GET"])
 async def get_logo(request: Request):

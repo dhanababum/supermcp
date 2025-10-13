@@ -1,3 +1,6 @@
+import sys
+sys.path.append("/Users/dhanababu/workspace/forge-mcptools/mcp_pkg")
+print(sys.path)
 __connector_name__ = "SQL databases"
 __connector_description__ = "Connect to SQL databases"
 __connector_version__ = "0.1.0"

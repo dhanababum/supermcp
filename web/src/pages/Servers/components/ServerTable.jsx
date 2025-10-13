@@ -1,6 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ServerConfigModal } from './index';
 
 const ServerTable = ({ servers, onView, onDelete }) => {
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [selectedServer, setSelectedServer] = useState(null);
+
+  const handleViewConfig = (server) => {
+    setSelectedServer(server);
+    setConfigModalOpen(true);
+  };
+
+  const handleCloseConfig = () => {
+    setConfigModalOpen(false);
+    setSelectedServer(null);
+  };
+
   if (servers.length === 0) {
     return (
       <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
@@ -91,6 +105,12 @@ const ServerTable = ({ servers, onView, onDelete }) => {
                 >
                   View
                 </button>
+                <button 
+                  onClick={() => handleViewConfig(server)}
+                  className="text-green-600 hover:text-green-900 mr-3"
+                >
+                  Config
+                </button>
                 <button className="text-blue-600 hover:text-blue-900 mr-3">
                   Edit
                 </button>
@@ -105,6 +125,13 @@ const ServerTable = ({ servers, onView, onDelete }) => {
           ))}
         </tbody>
       </table>
+      
+      {/* Server Config Modal */}
+      <ServerConfigModal
+        server={selectedServer}
+        isOpen={configModalOpen}
+        onClose={handleCloseConfig}
+      />
     </div>
   );
 };

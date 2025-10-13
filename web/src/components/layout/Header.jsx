@@ -1,4 +1,5 @@
 import React from 'react';
+import { RoleIndicator } from '../common';
 
 const Header = () => {
   return (
@@ -49,9 +50,7 @@ const Header = () => {
             <span className="text-sm text-gray-700">Company</span>
             <span className="text-sm text-gray-700">Portal</span>
           </div>
-          <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-            JS
-          </div>
+          <RoleIndicator />
         </div>
       </div>
     </header>

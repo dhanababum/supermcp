@@ -26,7 +26,7 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from pydantic import BaseModel
-from models import McpConnector, McpServer, McpServerToken, McpServerTool, User
+from models import McpConnector, McpServer, McpServerToken, McpServerTool, User, ConnectorAccess
 from database import get_session
 from utils import store_logo, get_tool_id
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -49,6 +49,20 @@ class CreateToolFromTemplateRequest(BaseModel):
 
 class AuthRequest(BaseModel):
     token: str
+
+
+class GrantConnectorAccessRequest(BaseModel):
+    user_id: uuid.UUID
+    connector_id: int
+
+
+class RevokeConnectorAccessRequest(BaseModel):
+    user_id: uuid.UUID
+    connector_id: int
+
+
+class UpdateUserRoleRequest(BaseModel):
+    is_superuser: bool
 
 
 token_header = HTTPBearer()
@@ -79,9 +93,71 @@ def get_all_connectors(session: Session):
     return connectors
 
 
+def is_superuser(user: User) -> bool:
+    """Check if user has superuser role using fastapi-users built-in field."""
+    return user.is_superuser
+
+
+def check_superuser_access(user: User):
+    """Raise HTTPException if user is not a superuser."""
+    if not is_superuser(user):
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied. Superuser role required."
+        )
+
+
+def require_superuser():
+    """FastAPI dependency that requires superuser access."""
+    def superuser_dependency(user: User = Depends(current_active_user)):
+        check_superuser_access(user)
+        return user
+    return superuser_dependency
+
+
+def get_user_accessible_connectors(session: Session, user: User) -> List[McpConnector]:
+    """Get connectors that the user has access to."""
+    if is_superuser(user):
+        # Superusers can see all connectors
+        return session.exec(select(McpConnector).where(McpConnector.is_active.is_(True))).all()
+    else:
+        # Regular users can only see connectors they have access to
+        statement = select(McpConnector).join(ConnectorAccess).where(
+            ConnectorAccess.user_id == user.id,
+            ConnectorAccess.is_active.is_(True),
+            McpConnector.is_active.is_(True)
+        )
+        return session.exec(statement).all()
+
+
+def check_connector_access(session: Session, user: User, connector_id: int) -> McpConnector:
+    """Check if user has access to a specific connector and return it."""
+    if is_superuser(user):
+        # Superusers can access any connector
+        connector = session.get(McpConnector, connector_id)
+        if not connector or not connector.is_active:
+            raise HTTPException(status_code=404, detail="Connector not found")
+        return connector
+    else:
+        # Regular users need explicit access
+        statement = select(McpConnector).join(ConnectorAccess).where(
+            McpConnector.id == connector_id,
+            ConnectorAccess.user_id == user.id,
+            ConnectorAccess.is_active.is_(True),
+            McpConnector.is_active.is_(True)
+        )
+        connector = session.exec(statement).first()
+        if not connector:
+            raise HTTPException(
+                status_code=403, 
+                detail="Access denied. You don't have access to this connector."
+            )
+        return connector
+
+
 def create_connector_record(connector_data: dict, session: Session, user_id: uuid.UUID = None):
     if user_id:
-        connector_data["user_id"] = user_id
+        connector_data["created_by"] = user_id
     connector = McpConnector(**connector_data)
     session.add(connector)
     session.commit()
@@ -157,12 +233,12 @@ def get_connectors(
 ) -> list:
     print(f"Current user: {current_user}")
     print(f"Current user ID: {current_user.id}")
-    print(f"Current user type: {type(current_user.id)}")
+    print(f"Current user is_superuser: {current_user.is_superuser}")
     
     try:
-        # Query connectors directly by user_id without using the relationship
-        connectors = get_all_connectors(session)
-        print(f"Found {len(connectors)} connectors")
+        # Get connectors based on user role and access
+        connectors = get_user_accessible_connectors(session, current_user)
+        print(f"Found {len(connectors)} accessible connectors")
         
         # Convert to dict to avoid relationship serialization issues
         result = []
@@ -189,7 +265,7 @@ def get_connectors(
 def create_connector(
     request: CreateConnectorRequest, 
     session: Session = Depends(get_session),
-    current_user: User = Depends(current_active_user)
+    current_user: User = Depends(require_superuser())
 ) -> dict:
     req = requests.get(request.connector_url)
     if req.status_code != 200:
@@ -243,15 +319,253 @@ def create_connector(
 
 
 @router.get("/connector-schema/{connector_id}")
-def get_connector_schema_endpoint(connector_id: int, session: Session = Depends(get_session)) -> dict:
-    # Try to get schema from database first
-    statement = select(McpConnector).where(
-        McpConnector.id == connector_id,
-        McpConnector.is_active.is_(True)
-    )
-    connector = session.exec(statement).first()
-
+def get_connector_schema_endpoint(
+    connector_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(current_active_user)
+) -> dict:
+    # Check if user has access to this connector
+    connector = check_connector_access(session, current_user, connector_id)
     return connector.server_config
+
+
+@router.post("/connectors/grant-access")
+def grant_connector_access(
+    request: GrantConnectorAccessRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> dict:
+    """Grant a user access to a connector. Only superusers can do this."""
+    
+    # Verify the connector exists
+    connector = session.get(McpConnector, request.connector_id)
+    if not connector or not connector.is_active:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    
+    # Verify the user exists
+    user = session.get(User, request.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if access already exists
+    existing_access = session.exec(
+        select(ConnectorAccess).where(
+            ConnectorAccess.connector_id == request.connector_id,
+            ConnectorAccess.user_id == request.user_id,
+            ConnectorAccess.is_active.is_(True)
+        )
+    ).first()
+    
+    if existing_access:
+        raise HTTPException(
+            status_code=400, 
+            detail="User already has access to this connector"
+        )
+    
+    # Create new access record
+    access = ConnectorAccess(
+        connector_id=request.connector_id,
+        user_id=request.user_id,
+        granted_by=current_user.id
+    )
+    session.add(access)
+    session.commit()
+    session.refresh(access)
+    
+    return {
+        "status": "success",
+        "message": f"Access granted to user {user.email} for connector {connector.name}",
+        "access_id": access.id
+    }
+
+
+@router.post("/connectors/revoke-access")
+def revoke_connector_access(
+    request: RevokeConnectorAccessRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> dict:
+    """Revoke a user's access to a connector. Only superusers can do this."""
+    
+    # Find the access record
+    access = session.exec(
+        select(ConnectorAccess).where(
+            ConnectorAccess.connector_id == request.connector_id,
+            ConnectorAccess.user_id == request.user_id,
+            ConnectorAccess.is_active.is_(True)
+        )
+    ).first()
+    
+    if not access:
+        raise HTTPException(
+            status_code=404, 
+            detail="Access record not found"
+        )
+    
+    # Mark as inactive
+    access.is_active = False
+    access.updated_at = datetime.utcnow()
+    session.add(access)
+    session.commit()
+    
+    return {
+        "status": "success",
+        "message": f"Access revoked for user {request.user_id} from connector {request.connector_id}"
+    }
+
+
+@router.get("/connectors/{connector_id}/access")
+def get_connector_access(
+    connector_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> List[dict]:
+    """Get all users who have access to a connector. Only superusers can do this."""
+    
+    # Verify the connector exists
+    connector = session.get(McpConnector, connector_id)
+    if not connector or not connector.is_active:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    
+    # Get all access records for this connector
+    access_records = session.exec(
+        select(ConnectorAccess).where(
+            ConnectorAccess.connector_id == connector_id,
+            ConnectorAccess.is_active.is_(True)
+        )
+    ).all()
+    
+    result = []
+    for access in access_records:
+        user = session.get(User, access.user_id)
+        granted_by_user = session.get(User, access.granted_by)
+        
+        result.append({
+            "id": access.id,
+            "user_id": access.user_id,
+            "user_email": user.email if user else "Unknown",
+            "granted_by": access.granted_by,
+            "granted_by_email": granted_by_user.email if granted_by_user else "Unknown",
+            "created_at": access.created_at.isoformat(),
+            "updated_at": access.updated_at.isoformat()
+        })
+    
+    return result
+
+
+@router.patch("/users/{user_id}/role")
+def update_user_role(
+    user_id: uuid.UUID,
+    request: UpdateUserRoleRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> dict:
+    """Update a user's superuser status. Only superusers can do this."""
+    
+    # Get the target user
+    target_user = session.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update the superuser status
+    target_user.is_superuser = request.is_superuser
+    session.add(target_user)
+    session.commit()
+    session.refresh(target_user)
+    
+    role_text = "superuser" if request.is_superuser else "regular user"
+    return {
+        "status": "success",
+        "message": f"User {target_user.email} role updated to {role_text}",
+        "user_id": str(user_id),
+        "is_superuser": target_user.is_superuser
+    }
+
+
+@router.get("/users")
+def list_users(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> List[dict]:
+    """List all users. Only superusers can do this."""
+    
+    try:
+        users = session.exec(select(User)).all()
+        
+        result = []
+        for user in users:
+            # Safely get user attributes
+            user_data = {
+                "id": str(user.id),
+                "email": user.email,
+                "is_active": getattr(user, 'is_active', True),
+                "is_superuser": getattr(user, 'is_superuser', False),
+                "is_verified": getattr(user, 'is_verified', False),
+            }
+            
+            # Add optional fields if they exist
+            if hasattr(user, 'created_at') and user.created_at:
+                user_data["created_at"] = user.created_at.isoformat()
+            if hasattr(user, 'updated_at') and user.updated_at:
+                user_data["updated_at"] = user.updated_at.isoformat()
+            
+            result.append(user_data)
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error listing users: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to list users"
+        )
+
+
+@router.get("/users/search")
+def search_users(
+    q: str = Query(..., description="Search query for user email"),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> List[dict]:
+    """Search users by email. Only superusers can do this."""
+    
+    if not q or len(q.strip()) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Search query must be at least 2 characters long"
+        )
+    
+    try:
+        # Search for users by email (case-insensitive)
+        users = session.exec(
+            select(User).where(User.email.ilike(f"%{q.strip()}%"))
+        ).all()
+        
+        result = []
+        for user in users:
+            # Safely get user attributes
+            user_data = {
+                "id": str(user.id),
+                "email": user.email,
+                "is_active": getattr(user, 'is_active', True),
+                "is_superuser": getattr(user, 'is_superuser', False),
+                "is_verified": getattr(user, 'is_verified', False),
+            }
+            
+            # Add optional fields if they exist
+            if hasattr(user, 'created_at') and user.created_at:
+                user_data["created_at"] = user.created_at.isoformat()
+            
+            result.append(user_data)
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error searching users: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to search users"
+        )
 
 
 @router.post("/servers")
@@ -284,14 +598,13 @@ def create_server(
     
     connector_id = server_data.pop("connector_id")
     
+    # Check if user has access to this connector
+    connector = check_connector_access(session, current_user, connector_id)
+    
     mcp_server = McpServer(**server_data, connector_id=connector_id, user_id=current_user.id)
     session.add(mcp_server)
     session.commit()
     session.refresh(mcp_server)
-
-    connector = session.get(McpConnector, connector_id)
-    if not connector:
-        raise HTTPException(status_code=404, detail=f"Connector with id {connector_id} not found")
     
     tools_list = connector.tools_config
 
@@ -351,6 +664,7 @@ def list_all_servers(
             "id": config.id,
             "connector_id": config.connector_id,
             "server_name": config.server_name,
+            "server_url": config.server_url,
             "configuration": config.configuration,
             "created_at": config.created_at.isoformat(),
             "updated_at": config.updated_at.isoformat(),
@@ -525,6 +839,43 @@ def delete_server(
     except Exception as e:
         session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete server: {str(e)}")
+
+
+@router.get("/servers/{server_id}/tokens")
+def get_server_tokens(
+    server_id: int,
+    session: Session = Depends(get_session)
+) -> List[dict]:
+    """
+    Retrieve all active tokens for a specific server.
+    """
+    # First check if the server exists
+    server_statement = select(McpServer).where(
+        McpServer.id == server_id,
+        McpServer.is_active.is_(True)
+    )
+    server = session.exec(server_statement).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail=f"No server found with id: {server_id}")
+    
+    # Get active tokens for this server
+    token_statement = select(McpServerToken).where(
+        McpServerToken.mcp_server_id == server_id,
+        McpServerToken.is_active.is_(True)
+    )
+    tokens = session.exec(token_statement).all()
+    
+    return [
+        {
+            "id": token.id,
+            "token": token.token,
+            "expires_at": token.expires_at.isoformat() if token.expires_at else None,
+            "created_at": token.created_at.isoformat(),
+            "is_active": token.is_active
+        }
+        for token in tokens
+    ]
 
 
 @router.get("/servers/{server_id}/tools/database")

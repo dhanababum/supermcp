@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { api } from '../../../services/api';
 
 const AddConnectorModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -25,15 +26,11 @@ const AddConnectorModal = ({ isOpen, onClose, onSuccess }) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:9000/api/connectors', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const result = await api.createConnector(
+        {
           connector_url: formData.url
-        })
-      });
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();

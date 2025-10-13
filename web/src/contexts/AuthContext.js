@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { authCookies } from '../services/cookies';
 import { api } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -30,7 +29,6 @@ export const AuthProvider = ({ children }) => {
     if (isMountedRef.current) setIsLoading(true);
 
     try {
-      console.log('Checking auth status, cookies present:', authCookies.hasAuthCookies && authCookies.hasAuthCookies());
       try {
         const result = await api.getMe();
         if (!result) {
@@ -65,7 +63,6 @@ export const AuthProvider = ({ children }) => {
       if (isMountedRef.current) {
         setIsAuthenticated(false);
         setUser(null);
-        try { authCookies.clearAuth(); } catch (e) { /* ignore */ }
       }
     } finally {
       isCheckingRef.current = false;
@@ -117,7 +114,6 @@ export const AuthProvider = ({ children }) => {
       if (isMountedRef.current) {
         setIsAuthenticated(false);
         setUser(null);
-        try { authCookies.clearAuth(); } catch (e) { /* ignore */ }
         setIsLoading(false);
       }
     }
@@ -134,6 +130,16 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth:refresh', handleAuthRefresh);
   }, [checkAuthStatus]);
 
+  // Role-based helper functions
+  const isSuperuser = useCallback(() => {
+    return user?.is_superuser === true;
+  }, [user]);
+
+  const hasRole = useCallback((role) => {
+    if (role === 'superuser') return isSuperuser();
+    return false;
+  }, [isSuperuser]);
+
   const value = {
     isAuthenticated,
     isLoading,
@@ -141,6 +147,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     checkAuthStatus,
+    isSuperuser,
+    hasRole,
   };
 
   return (
