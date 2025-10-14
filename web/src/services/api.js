@@ -9,6 +9,8 @@ const API_ROUTES = {
   
   // API endpoints
   connectors: '/api/connectors',
+  registerConnector: '/api/connectors/register',
+  activateConnector: '/api/connectors/activate',
   connectorSchema: (id) => `/api/connector-schema/${id}`,
   servers: '/api/servers',
   server: (id) => `/api/servers/${id}`,
@@ -133,6 +135,34 @@ export const api = {
     return apiRequest(API_ROUTES.connectors, {
       method: 'POST',
       body: JSON.stringify(connectorData),
+    });
+  },
+
+  // Two-step connector registration
+  registerConnector: async (connectorData) => {
+    return apiRequest(API_ROUTES.registerConnector, {
+      method: 'POST',
+      body: JSON.stringify(connectorData),
+    });
+  },
+
+  activateConnector: async (activationData) => {
+    return apiRequest(API_ROUTES.activateConnector, {
+      method: 'POST',
+      body: JSON.stringify(activationData),
+    });
+  },
+
+  deleteConnector: async (connectorId) => {
+    return apiRequest(`${API_ROUTES.connectors}/${connectorId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  updateConnectorMode: async (connectorId, mode) => {
+    return apiRequest(`${API_ROUTES.connectors}/${connectorId}/mode`, {
+      method: 'PATCH',
+      body: JSON.stringify({ mode }),
     });
   },
 

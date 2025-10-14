@@ -375,7 +375,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
 
               {/* Enhanced Form with Dynamic Template String Input for String Properties */}
               <div className="space-y-6">
-                {Object.entries(selectedTemplate.properties || {}).map(([key, prop]) => (
+                {Object.entries(selectedTemplate.inputSchema?.properties || {}).map(([key, prop]) => (
                   <div key={key} className="p-6 border border-gray-200 rounded-xl bg-white shadow-sm">
                     {prop.type === 'string' ? (
                       // String properties get Dynamic Template String Input functionality
@@ -483,7 +483,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                   {Object.keys(formData).length > 0 ? (
                     <div className="space-y-6">
                       {Object.entries(formData).map(([key, value]) => {
-                        const prop = selectedTemplate.properties[key];
+                        const prop = selectedTemplate.inputSchema?.properties?.[key];
                         const isStringWithPlaceholders = prop?.type === 'string' && value && extractPlaceholders(value).length > 0;
                         
                         return (

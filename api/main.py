@@ -5,15 +5,21 @@ import logging
 import uuid
 from pathlib import Path
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+import os
 import requests
+import uuid
+import bcrypt
+import jwt
+import os
 
-from datatypes import McpServerToolItem, ToolType, McpConnectorTemplateItem
+from datatypes import McpServerToolItem, ToolType, McpConnectorTemplateItem, ConnectorMode
 from datatypes import UserCreate, UserRead, UserUpdate
 from users import jwt_auth_backend, cookie_auth_backend, current_active_user, fastapi_users
+from models import McpConnector, McpServer, McpServerToken, McpServerTool, User, ConnectorAccess
 
 # Add parent directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Disable SQLAlchemy logging to reduce verbosity
 logging.getLogger('sqlalchemy').setLevel(logging.WARNING)
@@ -25,22 +31,35 @@ logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
-from pydantic import BaseModel
-from models import McpConnector, McpServer, McpServerToken, McpServerTool, User, ConnectorAccess
+from pydantic import UUID1, BaseModel
 from database import get_session
 from utils import store_logo, get_tool_id
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")  # use env and rotate in prod
+JWT_ALGO = "HS256"
+
+
+class RegisterRequest(BaseModel):
+    name: str
 
 
 app = FastAPI(title="MCP Tools API", description="API for MCP Tools", version="0.1.0")
 
 
+class RegisterConnectorRequest(BaseModel):
+    name: str
+    description: str
+    secret: Optional[str] = None  # Optional connector secret
+
+
 class CreateConnectorRequest(BaseModel):
-    connector_url: str
+    connector_id: str  # ID of the registered connector to activate
+    connector_url: str  # URL to fetch the connector schema from
 
 
 class CreateToolFromTemplateRequest(BaseModel):
-    connector_id: int
+    connector_id: str
     template_name: str
     template_params: dict
     tool_name: str
@@ -226,6 +245,24 @@ def read_root():
     return {"message": "Hello, World!"}
 
 
+@app.post("/register-connector")
+def register_connector(req: RegisterRequest, session: Session = Depends(get_session)):
+    secret = uuid.uuid4().hex  # show once to user
+    secret_hash = bcrypt.hashpw(secret.encode(), bcrypt.gensalt()).decode()
+
+    connector = McpConnector(
+        name=req.name,
+        secret=secret_hash,
+        mode=ConnectorMode.sync.value,  # Convert enum to string value
+        created_at=datetime.utcnow(),
+    )
+    session.add(connector)
+    session.commit()
+    session.refresh(connector)
+    # Return connector id + secret (only displayed once in UI)
+    return {"connector_id": connector.id, "secret": secret}
+
+
 @router.get("/connectors")
 def get_connectors(
     session: Session = Depends(get_session),
@@ -250,6 +287,7 @@ def get_connectors(
                 "description": connector.description,
                 "version": connector.version,
                 "logo_url": connector.logo_url,
+                "mode": connector.mode if isinstance(connector.mode, str) else connector.mode.value,
                 "created_at": connector.created_at.isoformat() if connector.created_at else None,
                 "updated_at": connector.updated_at.isoformat() if connector.updated_at else None,
                 "is_active": connector.is_active
@@ -261,12 +299,253 @@ def get_connectors(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+# get all active servers based on connector id
+@router.get("/connectors/{connector_id}/servers")
+def get_servers(connector_id: str, session: Session = Depends(get_session)) -> List[dict]:
+    """
+    Get all active servers based on connector id.
+    """
+    return session.exec(
+        select(McpServer).where(
+            McpServer.connector_id == connector_id,
+            McpServer.is_active.is_(True))).all()
+
+
+@router.post("/connectors/register")
+def register_connector(
+    request: RegisterConnectorRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> dict:
+    """
+    Step 1: Register a connector with basic metadata.
+    This creates a connector record in 'deactive' mode.
+    The connector will be activated later when the connector server is running.
+    Only superusers can register connectors.
+    """
+    try:
+        # Check if connector with this name already exists
+        existing = session.exec(
+            select(McpConnector).where(
+                McpConnector.name == request.name,
+                McpConnector.is_active.is_(True)
+            )
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Connector with name '{request.name}' already exists"
+            )
+        
+        # Generate a unique secret for the connector
+        secret_plain = uuid.uuid4().hex  # Generate a random secret
+        secret_hash = bcrypt.hashpw(secret_plain.encode(), bcrypt.gensalt())
+        
+        # Create connector in deactive mode
+        connector_data = {
+            "name": request.name,
+            "url": "",  # Will be set during activation
+            "description": request.description,
+            "version": "0.0.0",  # Will be updated during activation
+            "source_logo_url": b"",
+            "logo_url": "",
+            "mode": ConnectorMode.sync.value,  # Convert enum to string value
+            "secret": secret_hash,  # Store hashed secret
+            "tools_config": [],
+            "templates_config": [],
+            "server_config": {},
+            "is_active": True  # The record is active, but connector mode is deactive
+        }
+        
+        connector = create_connector_record(connector_data, session, current_user.id)
+        
+        return {
+            "status": "registered",
+            "message": f"Connector '{connector.name}' registered successfully",
+            "connector_id": str(connector.id),  # Convert UUID to string
+            "secret": secret_plain,  # Return plain secret (only shown once)
+            "name": connector.name,
+            "mode": connector.mode.value if hasattr(connector.mode, 'value') else connector.mode,
+            "description": connector.description,
+            "created_at": connector.created_at.isoformat(),
+            "next_step": "Activate the connector by providing the connector URL via POST /api/connectors/activate"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to register connector: {str(e)}")
+
+
+@router.post("/connectors/activate")
+def activate_connector(
+    request: CreateConnectorRequest, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> dict:
+    """
+    Step 2: Activate a registered connector by fetching its schema from the connector URL.
+    This updates the connector with actual configuration and changes mode to 'active'.
+    Only superusers can activate connectors.
+    """
+    try:
+        # Get the registered connector
+        connector = session.get(McpConnector, request.connector_id)
+        
+        if not connector:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Connector with ID {request.connector_id} not found"
+            )
+        
+        if not connector.is_active:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Connector '{connector.name}' is not active"
+            )
+        
+        # Fetch connector schema from URL
+        try:
+            req = requests.get(request.connector_url, timeout=10)
+            if req.status_code != 200:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to fetch connector schema from {request.connector_url}. Status: {req.status_code}"
+                )
+            connector_data = req.json()
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to connect to connector URL: {str(e)}"
+            )
+        
+        # Extract schema data
+        name = connector_data.get("name", connector.name)
+        tools = connector_data.get("tools", [])
+        templates = connector_data.get("templates", {})
+        server_config = connector_data.get("config", {})
+        version = connector_data.get("version", "1.0.0")
+        description = connector_data.get("description", connector.description)
+        logo_url = connector_data.get("logo_url", "")
+        
+        # Update connector with fetched data
+        connector.url = request.connector_url
+        connector.description = description
+        connector.version = version
+        connector.logo_url = logo_url
+        connector.source_logo_url = logo_url.encode() if logo_url else b""
+        connector.tools_config = tools
+        connector.templates_config = templates
+        connector.server_config = server_config
+        connector.mode = ConnectorMode.active.value  # Convert enum to string value
+        connector.updated_at = datetime.utcnow()
+        
+        session.add(connector)
+        session.commit()
+        session.refresh(connector)
+        
+        # Store logo if available
+        if logo_url and logo_url.strip():
+            try:
+                store_logo(logo_url, connector.name)
+            except Exception as e:
+                print(f"Warning: Failed to store logo: {str(e)}")
+        
+        return {
+            "status": "activated",
+            "message": f"Connector '{connector.name}' activated successfully",
+            "connector_id": connector.id,
+            "name": connector.name,
+            "url": connector.url,
+            "mode": connector.mode.value if hasattr(connector.mode, 'value') else connector.mode,
+            "version": connector.version,
+            "tools_count": len(tools),
+            "templates_count": len(templates) if isinstance(templates, list) else len(templates.keys()) if isinstance(templates, dict) else 0,
+            "created_at": connector.created_at.isoformat(),
+            "updated_at": connector.updated_at.isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to activate connector: {str(e)}")
+
+
+@router.patch("/connectors/{connector_id}/mode")
+def update_connector_mode(
+    connector_id: uuid.UUID,
+    request: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> dict:
+    """
+    Update connector mode (active/deactive toggle).
+    Only superusers can update connector mode.
+    """
+    try:
+        # Get the connector
+        connector = session.get(McpConnector, connector_id)
+        
+        if not connector:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Connector with ID {connector_id} not found"
+            )
+        
+        # Get the new mode from request
+        new_mode = request.get('mode')
+        if not new_mode:
+            raise HTTPException(
+                status_code=400,
+                detail="Mode field is required"
+            )
+        
+        # Validate mode value
+        valid_modes = ['active', 'deactive', 'sync']
+        if new_mode not in valid_modes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid mode. Must be one of: {', '.join(valid_modes)}"
+            )
+        
+        # Update the mode
+        connector.mode = new_mode
+        connector.updated_at = datetime.utcnow()
+        
+        session.add(connector)
+        session.commit()
+        session.refresh(connector)
+        
+        return {
+            "status": "success",
+            "message": f"Connector mode updated to {new_mode}",
+            "connector": {
+                "id": str(connector.id),
+                "name": connector.name,
+                "mode": connector.mode if isinstance(connector.mode, str) else connector.mode.value
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update connector mode: {str(e)}")
+
+
 @router.post("/connectors")
 def create_connector(
     request: CreateConnectorRequest, 
     session: Session = Depends(get_session),
     current_user: User = Depends(require_superuser())
 ) -> dict:
+    """
+    DEPRECATED: Use /connectors/register and /connectors/activate instead.
+    This endpoint is kept for backward compatibility.
+    """
     req = requests.get(request.connector_url)
     if req.status_code != 200:
         raise HTTPException(status_code=400, detail="Failed to get connector schema")
@@ -318,9 +597,64 @@ def create_connector(
     }
 
 
+@router.delete("/connectors/{connector_id}")
+def delete_connector(
+    connector_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superuser())
+) -> dict:
+    """
+    Delete a connector (hard delete). Only superusers can do this.
+    Database CASCADE DELETE will automatically remove:
+    - All servers using this connector (via FK CASCADE on mcp_servers.connector_id)
+    - All user access grants (via FK CASCADE on connector_access.connector_id)
+    """
+    try:
+        # Get the connector
+        connector = session.get(McpConnector, connector_id)
+        
+        if not connector:
+            raise HTTPException(status_code=404, detail=f"Connector with id {connector_id} not found")
+        
+        # Count affected resources before deletion (for reporting)
+        access_count = len(session.exec(
+            select(ConnectorAccess).where(
+                ConnectorAccess.connector_id == connector_id,
+                ConnectorAccess.is_active.is_(True)
+            )
+        ).all())
+        
+        servers_count = len(session.exec(
+            select(McpServer).where(
+                McpServer.connector_id == connector_id,
+                McpServer.is_active.is_(True)
+            )
+        ).all())
+        
+        connector_name = connector.name
+        
+        # Delete the connector - CASCADE will handle both servers and access grants automatically
+        session.delete(connector)
+        session.commit()
+        
+        return {
+            "status": "deleted",
+            "message": f"Connector '{connector_name}' and all related data deleted successfully",
+            "connector_id": connector_id,
+            "revoked_access": access_count,
+            "deleted_servers": servers_count
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete connector: {str(e)}")
+
+
 @router.get("/connector-schema/{connector_id}")
 def get_connector_schema_endpoint(
-    connector_id: int, 
+    connector_id: str,
     session: Session = Depends(get_session),
     current_user: User = Depends(current_active_user)
 ) -> dict:
@@ -932,7 +1266,7 @@ def get_database_tools(
 
 @router.get("/servers/{server_id}/tools")
 def get_server_tools(
-    server_id: int,
+    server_id: uuid.UUID,
     session: Session = Depends(get_session),
     current_user: User = Depends(current_active_user)
 ) -> dict:
@@ -1083,7 +1417,7 @@ def delete_tool(
 
 @router.get("/connectors/{connector_id}/templates")
 def get_templates(
-    connector_id: int,
+    connector_id: str,
     session: Session = Depends(get_session)
 ) -> List[McpConnectorTemplateItem]:
     """
@@ -1106,7 +1440,7 @@ def get_templates(
 
 @router.post("/servers/{server_id}/tools")
 def create_tool_from_template(
-    server_id: int,
+    server_id: str,
     tool_data: dict,
     session: Session = Depends(get_session)
 ) -> McpServerToolItem:

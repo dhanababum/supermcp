@@ -50,6 +50,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "bcrypt" },
     { name = "fastapi" },
     { name = "fastapi-mcp" },
     { name = "fastapi-users" },
@@ -67,6 +68,7 @@ dependencies = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.16.5" },
     { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "bcrypt", specifier = ">=4.3.0" },
     { name = "fastapi", specifier = ">=0.118.0" },
     { name = "fastapi-mcp", specifier = ">=0.4.0" },
     { name = "fastapi-users", specifier = ">=14.0.1" },

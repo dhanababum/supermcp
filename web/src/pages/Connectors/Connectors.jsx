@@ -1,14 +1,28 @@
 import React, { useState } from 'react';
 import { useConnectors } from '../../hooks';
 import { useAuth } from '../../contexts/AuthContext';
-import { LoadingSpinner, ErrorMessage } from '../../components/common';
-import { ConnectorCard, ConfigurationModal, AddConnectorModal, AccessRequestPrompt } from './components';
+import { LoadingSpinner, ErrorMessage, Notification } from '../../components/common';
+import { 
+  ConnectorCard, 
+  ConfigurationModal, 
+  AddConnectorModal, 
+  RegisterConnectorModal,
+  ActivateConnectorModal,
+  RegisterUrlModal,
+  AccessRequestPrompt 
+} from './components';
 
 const Connectors = () => {
   const { connectors, loading, error, refetch } = useConnectors(true);
   const { isSuperuser, user } = useAuth();
   const [selectedConnector, setSelectedConnector] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showActivateModal, setShowActivateModal] = useState(false);
+  const [showRegisterUrlModal, setShowRegisterUrlModal] = useState(false);
+  const [connectorToActivate, setConnectorToActivate] = useState(null);
+  const [connectorToRegisterUrl, setConnectorToRegisterUrl] = useState(null);
+  const [notification, setNotification] = useState(null);
 
   const handleConfigureConnector = (connector) => {
     setSelectedConnector(connector);
@@ -33,6 +47,58 @@ const Connectors = () => {
     setShowAddModal(false);
   };
 
+  const handleRegisterConnector = () => {
+    setShowRegisterModal(true);
+  };
+
+  const handleCloseRegisterModal = () => {
+    setShowRegisterModal(false);
+  };
+
+  const handleRegisterSuccess = (result) => {
+    setNotification({
+      type: 'success',
+      message: `Connector "${result.name}" registered successfully! You can now activate it.`
+    });
+    handleSuccess();
+  };
+
+  const handleActivateConnector = (connector) => {
+    setConnectorToActivate(connector);
+    setShowActivateModal(true);
+  };
+
+  const handleCloseActivateModal = () => {
+    setShowActivateModal(false);
+    setConnectorToActivate(null);
+  };
+
+  const handleActivateSuccess = (result) => {
+    setNotification({
+      type: 'success',
+      message: `Connector "${result.name}" activated successfully! Found ${result.tools_count} tools.`
+    });
+    handleSuccess();
+  };
+
+  const handleRegisterUrl = (connector) => {
+    setConnectorToRegisterUrl(connector);
+    setShowRegisterUrlModal(true);
+  };
+
+  const handleCloseRegisterUrlModal = () => {
+    setShowRegisterUrlModal(false);
+    setConnectorToRegisterUrl(null);
+  };
+
+  const handleRegisterUrlSuccess = (result) => {
+    setNotification({
+      type: 'success',
+      message: `Connector "${result.connector?.name || 'Unknown'}" registered with URL successfully! Mode updated to ${result.connector?.mode || 'active'}.`
+    });
+    handleSuccess();
+  };
+
 
   return (
     <div>
@@ -55,18 +121,27 @@ const Connectors = () => {
         />
       ) : (
         <div>
+          {/* Notification */}
+          {notification && (
+            <Notification
+              type={notification.type}
+              message={notification.message}
+              onClose={() => setNotification(null)}
+            />
+          )}
+
           {/* Role-based Action Bar */}
           {isSuperuser() && (
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <button 
-                  onClick={handleAddConnector}
-                  className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                  onClick={handleRegisterConnector}
+                  className="px-4 py-2 bg-purple-100 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-200 border border-purple-300 flex items-center space-x-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  <span>Add Connector</span>
+                  <span>Register Connector</span>
                 </button>
                 <button 
                   onClick={() => refetch()}
@@ -128,6 +203,9 @@ const Connectors = () => {
                     key={connector.id}
                     connector={connector}
                     onConfigure={handleConfigureConnector}
+                    onDelete={handleSuccess}
+                    onActivate={handleActivateConnector}
+                    onRegisterUrl={handleRegisterUrl}
                   />
                 ))}
               </div>
@@ -183,12 +261,41 @@ const Connectors = () => {
         />
       )}
 
-      {/* Add Connector Modal - Superuser Only */}
+      {/* Add Connector Modal - Superuser Only (Old Method) */}
       {isSuperuser() && (
         <AddConnectorModal
           isOpen={showAddModal}
           onClose={handleCloseAddModal}
           onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* Register Connector Modal - Superuser Only (Step 1) */}
+      {isSuperuser() && (
+        <RegisterConnectorModal
+          isOpen={showRegisterModal}
+          onClose={handleCloseRegisterModal}
+          onSuccess={handleRegisterSuccess}
+        />
+      )}
+
+      {/* Activate Connector Modal - Superuser Only (Step 2) */}
+      {isSuperuser() && (
+        <ActivateConnectorModal
+          isOpen={showActivateModal}
+          onClose={handleCloseActivateModal}
+          connector={connectorToActivate}
+          onSuccess={handleActivateSuccess}
+        />
+      )}
+
+      {/* Register URL Modal - Superuser Only (For Sync Mode) */}
+      {isSuperuser() && (
+        <RegisterUrlModal
+          isOpen={showRegisterUrlModal}
+          onClose={handleCloseRegisterUrlModal}
+          connector={connectorToRegisterUrl}
+          onSuccess={handleRegisterUrlSuccess}
         />
       )}
 

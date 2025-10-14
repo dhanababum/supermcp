@@ -4,6 +4,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from fastapi_users import schemas
 
 
+class ConnectorMode(Enum):
+    sync = "sync"
+    active = "active"
+    deactive = "deactive"
+
+
 class ToolType(Enum):
     static = "static"
     dynamic = "dynamic"
@@ -11,7 +17,7 @@ class ToolType(Enum):
 
 class McpConnectorToolItem(BaseModel):
     name: str
-    description: str
+    description: str | None = None
     inputSchema: dict = Field(default_factory=dict)
     model_config = ConfigDict(extra="allow")
 
@@ -24,7 +30,7 @@ class McpConnectorTemplateItem(BaseModel):
 
 
 class McpServerToolItem(McpConnectorToolItem):
-    ...
+    model_config = ConfigDict(extra="allow")
 
 
 class McpServerTemplateItem(McpConnectorTemplateItem):

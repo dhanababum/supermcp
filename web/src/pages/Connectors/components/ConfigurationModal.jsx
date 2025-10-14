@@ -14,7 +14,22 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
     if (connector) {
       setLoading(true);
       api.getConnectorSchema(connector.id)
-        .then(setSchema)
+        .then((connectorConfig) => {
+          // Extract the actual schema from the config structure
+          // The connector config has this structure:
+          // { params: { properties: {...}, required: [...], ... } }
+          // or just the schema directly
+          let extractedSchema = connectorConfig;
+          
+          // If config has a 'params' property, use that as the schema
+          if (connectorConfig && connectorConfig.params) {
+            extractedSchema = connectorConfig.params;
+          }
+          
+          console.log('Connector config:', connectorConfig);
+          console.log('Extracted schema:', extractedSchema);
+          setSchema(extractedSchema);
+        })
         .catch((error) => {
           console.error('Error fetching schema:', error);
           alert('Failed to load connector schema: ' + error.message);

@@ -20,6 +20,7 @@ export const useConnectors = (shouldFetch) => {
         description: connector.description,
         version: connector.version,
         url: connector.url,
+        mode: connector.mode, // Include mode field for proper mode display
         status: connector.is_active ? 'Active' : 'Inactive',
         created_at: connector.created_at,
         updated_at: connector.updated_at

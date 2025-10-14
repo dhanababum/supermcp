@@ -30,8 +30,8 @@ const ServerTokenSelector = ({ onServerTokenSelect, selectedServer, selectedToke
   }, []);
 
   const handleServerSelect = (event) => {
-    const serverId = parseInt(event.target.value);
-    if (serverId === 0) {
+    const serverId = event.target.value;
+    if (serverId === '0' || serverId === '') {
       // "Select a server" option selected
       return;
     }
@@ -53,7 +53,7 @@ const ServerTokenSelector = ({ onServerTokenSelect, selectedServer, selectedToke
   };
 
   const handleTokenSelect = (event) => {
-    const tokenId = parseInt(event.target.value);
+    const tokenId = parseInt(event.target.value, 10);
     if (tokenId === 0 || !selectedServer) return;
     
     const token = selectedServer.tokens.find(t => t.id === tokenId);
@@ -119,11 +119,11 @@ const ServerTokenSelector = ({ onServerTokenSelect, selectedServer, selectedToke
             </label>
             <select
               id="server-select"
-              value={selectedServer?.id || 0}
+              value={selectedServer?.id || '0'}
               onChange={handleServerSelect}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 bg-white"
             >
-              <option value={0}>Select a server...</option>
+              <option value="0">Select a server...</option>
               {servers.map((server) => (
                 <option key={server.id} value={server.id}>
                   {server.server_name} (ID: {server.id}, Connector: {server.connector_id}) - {server.tokens?.length || 0} token{server.tokens?.length !== 1 ? 's' : ''}

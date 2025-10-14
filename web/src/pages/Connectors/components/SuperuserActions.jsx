@@ -74,15 +74,59 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
     }
   };
 
+  const handleDeleteConnector = async () => {
+    const confirmMessage = `Are you sure you want to delete "${connector.name}"?\n\nThis will:\n• Remove the connector\n• Revoke all user access\n• Disable all servers using this connector\n\nThis action cannot be undone.`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await api.deleteConnector(connector.id);
+      
+      setNotification({
+        message: `${result.message}\n• Revoked access: ${result.revoked_access} users\n• Disabled servers: ${result.disabled_servers}`,
+        type: 'success'
+      });
+      
+      // Notify parent to refresh the list
+      if (onAccessUpdate) {
+        setTimeout(() => {
+          onAccessUpdate();
+        }, 1500); // Give time for user to see the notification
+      }
+    } catch (err) {
+      setNotification({
+        message: `Failed to delete connector: ${err.message}`,
+        type: 'error'
+      });
+      console.error('Delete connector error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="flex items-center space-x-2">
         <button
           onClick={handleManageAccess}
           disabled={loading}
-          className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors disabled:opacity-50"
+          className="flex-1 px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors disabled:opacity-50"
         >
           {loading ? 'Loading...' : 'Manage Access'}
+        </button>
+        <button
+          onClick={handleDeleteConnector}
+          disabled={loading}
+          className="flex-1 px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors disabled:opacity-50 flex items-center justify-center space-x-1"
+          title="Delete connector"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <span>Delete</span>
         </button>
       </div>
 

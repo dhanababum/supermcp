@@ -7,6 +7,8 @@ from fastmcp import FastMCP
 from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse, JSONResponse
+
+from .singletone_server import SingletonDictionary
 from .auth import CustomTokenVerifier
 from .middleware import CustomToolMiddleware
 from .config import settings
@@ -72,6 +74,7 @@ def create_dynamic_mcp(
         auth=CustomTokenVerifier(base_url=settings.app_base_url),
         logo_file_path=logo_file_path,
     )
+    mcp_servers = SingletonDictionary()
     mcp.register_connector_config(config)
     mcp_app = mcp.http_app()
     mcp.add_middleware(
@@ -115,5 +118,16 @@ def create_dynamic_mcp(
     async def get_logo(request: Request):
         return FileResponse(
             os.path.join(mcp._logo_file_path))
-    # app.mount("/mcp", app=mcp_app)
+    
+    @app.post("/create-server/{server_id}")
+    def create_new_mcp_server(server_id: str):
+        """Endpoint to dynamically create and mount a new server."""
+        if server_id in mcp_servers:
+            return {"message": f"Server {server_id} already exists."}
+
+        app.mount(f"/mcp/{server_id}", app=mcp_app, name=server_id)
+        mcp_servers[server_id] = {}
+        return {
+            "message": f"Server {server_id} created and mounted at /mcp/{server_id}"}
+
     return mcp, mcp_app, app

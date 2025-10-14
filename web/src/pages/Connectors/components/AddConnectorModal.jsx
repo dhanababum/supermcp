@@ -32,13 +32,13 @@ const AddConnectorModal = ({ isOpen, onClose, onSuccess }) => {
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create connector');
-      }
+      // if (!response.ok) {
+      //   const errorData = await response.json();
+      //   throw new Error(errorData.detail || 'Failed to create connector');
+      // }
 
-      const result = await response.json();
-      console.log('Connector created:', result);
+      // const result = await response.json();
+      // console.log('Connector created:', result);
       
       // Reset form
       setFormData({
