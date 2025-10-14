@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.118.0",
     "fastapi-mcp>=0.4.0",
     "fastmcp>=2.12.4",
+    "ipdb>=0.13.13",
     "mcp-pkg",
     "mcp[cli]>=1.15.0",
     "pyjwt>=2.10.1",

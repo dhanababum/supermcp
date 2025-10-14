@@ -17,9 +17,15 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
       console.log('server......', server);
       if (tokens && tokens.length > 0) {
         const token = tokens[0]; // Use the first token
+        // Generate the server URL with server ID
+        const baseUrl = (typeof server.server_url === 'string' && server.server_url.trim()) 
+          ? server.server_url.trim() 
+          : `http://localhost:8016`;
+        const serverUrl = `${baseUrl}/mcp/${server.id}`;
+        
         const serverConfig = {
           [server.server_name]: {
-            url: server.server_url || `http://localhost:9000/api/servers/${server.id}`,
+            url: serverUrl,
             headers: {
               Authorization: `Bearer ${token.token}`
             }

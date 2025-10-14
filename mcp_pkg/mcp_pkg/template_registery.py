@@ -344,7 +344,7 @@ class TemplateMixin:
         self, 
         name: str, 
         raw_params: Dict[str, Any], 
-        **extra_kwargs
+        extra_kwargs: Dict[str, Any]
     ) -> Any:
         """
         Render a sync template with validated parameters.

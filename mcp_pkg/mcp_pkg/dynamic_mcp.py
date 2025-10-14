@@ -1,20 +1,38 @@
 import os
 import threading
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
+from fastapi.routing import Mount
 from fastmcp import FastMCP
 
 # from fastmcp.tools.tool import ParsedFunction
+import httpx
 from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse, JSONResponse
 
 from .singletone_server import SingletonDictionary
-from .auth import CustomTokenVerifier
+from .auth import CustomTokenVerifier, verify_token
+from fastapi.security import HTTPAuthorizationCredentials
 from .middleware import CustomToolMiddleware
 from .config import settings
 from .schema import ConnectorTemplate, ConnectorConfig
 from .template_registery import TemplateMixin
 from typing import Type
+
+
+def create_mcp_servers_dictionary(app, mcp_app):
+    mcp_servers = SingletonDictionary()
+    with httpx.Client(timeout=20) as client:
+        response = client.get(
+            f"{settings.app_base_url}/api/connectors/{settings.connector_id}/servers",
+            headers={"Authorization": f"Bearer {settings.connector_secret}"}
+        )
+        online_servers = response.json()
+        
+        for key, server in online_servers.items():
+            mcp_servers[key] = server
+            app.mount(f"/mcp/{key}", app=mcp_app, name=key)
+    return mcp_servers
 
 
 class DynamicMCP(FastMCP, TemplateMixin):
@@ -90,6 +108,7 @@ def create_dynamic_mcp(
         allow_headers=["*"],
         expose_headers=["mcp-session-id"]
     )
+    create_mcp_servers_dictionary(app, mcp_app)
 
     @app.get("/connector.json")
     async def get_tools(request: Request):
@@ -120,7 +139,9 @@ def create_dynamic_mcp(
             os.path.join(mcp._logo_file_path))
     
     @app.post("/create-server/{server_id}")
-    def create_new_mcp_server(server_id: str):
+    def create_new_mcp_server(
+        server_id: str,
+        _: dict = Depends(verify_token)):
         """Endpoint to dynamically create and mount a new server."""
         if server_id in mcp_servers:
             return {"message": f"Server {server_id} already exists."}
@@ -129,5 +150,20 @@ def create_dynamic_mcp(
         mcp_servers[server_id] = {}
         return {
             "message": f"Server {server_id} created and mounted at /mcp/{server_id}"}
+    
+    @app.post("/destroy-server/{server_id}")
+    def destroy_mcp_server(
+        server_id: str,
+        _: dict = Depends(
+            verify_token)):
+        """Endpoint to destroy a server."""
+        if server_id not in mcp_servers:
+            return {"message": f"Server {server_id} does not exist."}
+        del mcp_servers[server_id]
+        for index, route in enumerate(app.routes):
+            if isinstance(route, Mount) and route.path == f"/mcp/{server_id}":
+                del app.routes[index]
+                break
+        return {"message": f"Server {server_id} destroyed"}
 
     return mcp, mcp_app, app

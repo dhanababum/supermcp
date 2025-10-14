@@ -233,3 +233,6 @@ yarn-error.log*
 node_modules/
 
 chinook.*
+
+api-xy
+cursor_docs

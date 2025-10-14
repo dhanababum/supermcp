@@ -5,6 +5,8 @@ import os
 
 os.environ["API_BASE_URL"] = "http://localhost:9000"
 os.environ["API_WEB_URL"] = "http://localhost:3000"
+os.environ["CONNECTOR_SECRET"] = "b6cb409aefdd4338bee0627a6a2c5243"
+os.environ["CONNECTOR_ID"] = "5c91a05f-e9fa-4d8f-8903-b22c544f53aa"
 
 
 class TypeConnection(Enum):
@@ -50,8 +52,8 @@ def get_sql_db_config_template(params: GetSqlDbConfigTemplate) -> str:
 
 
 @mcp.template(name="select_query", params_model=SelectQueryTemplate)
-def select_query_template(params: SelectQueryTemplate) -> str:
-    return f"Hello, {params.query}!"
+def select_query_template(params: SelectQueryTemplate, **kwargs) -> str:
+    return params.query.format(**kwargs)
 
 
 if __name__ == "__main__":

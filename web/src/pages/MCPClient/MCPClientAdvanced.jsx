@@ -10,11 +10,12 @@ const MCPClientAdvanced = () => {
   const [transportType, setTransportType] = useState('streamable-http');
   const [availableTools, setAvailableTools] = useState([]);
   const [selectedTool, setSelectedTool] = useState(null);
-  const [toolArguments, setToolArguments] = useState({});
+  const [toolArguments, setToolArguments] = useState({}); // Store arguments per tool: {toolName: {arg1: value1, arg2: value2}}
   const [selectedServer, setSelectedServer] = useState(null);
   const [selectedToken, setSelectedToken] = useState(null);
   const [useServerSelection, setUseServerSelection] = useState(true);
   const [connectionAttempted, setConnectionAttempted] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const messagesEndRef = useRef(null);
 
   const { 
@@ -64,7 +65,7 @@ const MCPClientAdvanced = () => {
     
     // Use the server_url from the server data, or fallback to a default
     const serverUrl = (typeof server.server_url === 'string' && server.server_url.trim()) 
-      ? server.server_url.trim() 
+      ? `${server.server_url.trim()}/mcp/${server.id}`
       : `http://localhost:8016/mcp`;
     setServerUrl(serverUrl);
     
@@ -187,7 +188,7 @@ const MCPClientAdvanced = () => {
       setConnectionAttempted(false);
       setAvailableTools([]);
       setSelectedTool(null);
-      setToolArguments({});
+      setToolArguments({}); // Clear all tool arguments
     } catch (err) {
       addMessage('error', `Disconnect failed: ${err.message}`);
     }
@@ -313,10 +314,13 @@ const MCPClientAdvanced = () => {
     try {
       addMessage('user', `Calling tool: ${selectedTool.name}`);
       
-      // Convert tool arguments to proper types based on schema
-      const convertedArguments = convertArgumentsToProperTypes(toolArguments, selectedTool.inputSchema);
+      // Get arguments for the selected tool
+      const currentToolArgs = toolArguments[selectedTool.name] || {};
       
-      console.log('Original arguments:', toolArguments);
+      // Convert tool arguments to proper types based on schema
+      const convertedArguments = convertArgumentsToProperTypes(currentToolArgs, selectedTool.inputSchema);
+      
+      console.log('Original arguments:', currentToolArgs);
       console.log('Converted arguments:', convertedArguments);
       
       const result = await callTool(selectedTool.name, convertedArguments);
@@ -330,6 +334,42 @@ const MCPClientAdvanced = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleCopyServerConfig = async () => {
+    if (!selectedServer || !selectedToken) {
+      addMessage('error', 'No server or token selected');
+      return;
+    }
+
+    try {
+      // Generate the server URL with server ID
+      const baseUrl = (typeof selectedServer.server_url === 'string' && selectedServer.server_url.trim()) 
+        ? selectedServer.server_url.trim() 
+        : `http://localhost:8016`;
+      const serverUrl = `${baseUrl}/mcp/${selectedServer.id}`;
+
+      const serverConfig = {
+        [selectedServer.server_name]: {
+          url: serverUrl,
+          headers: {
+            "Authorization": `Bearer ${selectedToken.token}`
+          }
+        }
+      };
+
+      const configText = JSON.stringify(serverConfig, null, 2);
+      await navigator.clipboard.writeText(configText);
+      
+      setCopySuccess(true);
+      addMessage('system', 'Server configuration copied to clipboard!');
+      
+      // Reset copy success after 2 seconds
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy server config:', err);
+      addMessage('error', `Failed to copy configuration: ${err.message}`);
     }
   };
 
@@ -352,7 +392,8 @@ const MCPClientAdvanced = () => {
       };
 
       const getInputValue = () => {
-        const value = toolArguments[key];
+        const currentToolArgs = toolArguments[tool.name] || {};
+        const value = currentToolArgs[key];
         if (prop.type === 'boolean') {
           return value === true || value === 'true';
         }
@@ -361,7 +402,13 @@ const MCPClientAdvanced = () => {
 
       const handleInputChange = (e) => {
         const newValue = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-        setToolArguments(prev => ({ ...prev, [key]: newValue }));
+        setToolArguments(prev => ({
+          ...prev,
+          [tool.name]: {
+            ...prev[tool.name],
+            [key]: newValue
+          }
+        }));
       };
 
       return (
@@ -447,6 +494,45 @@ const MCPClientAdvanced = () => {
               selectedServer={selectedServer}
               selectedToken={selectedToken}
             />
+            
+            {/* Copy Server Configuration Button */}
+            {selectedServer && selectedToken && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900">Server Configuration</h3>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Copy this configuration for client-side tools
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCopyServerConfig}
+                    disabled={copySuccess}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center ${
+                      copySuccess
+                        ? 'bg-green-100 text-green-700 border border-green-300'
+                        : 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'
+                    }`}
+                  >
+                    {copySuccess ? (
+                      <>
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Config
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Manual URL Entry Mode */
@@ -563,7 +649,7 @@ const MCPClientAdvanced = () => {
               {isConnected ? 'No tools available' : 'Connect to a server to see available tools'}
             </div>
           ) : (
-            <div className="space-y-2 mb-4">
+            <div className="max-h-80 overflow-y-auto space-y-2 mb-4 pr-2">
               {(availableTools || []).map((tool, index) => (
                 <button
                   key={index}

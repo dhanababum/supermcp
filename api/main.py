@@ -4,9 +4,10 @@ import secrets
 import logging
 import uuid
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import os
+import httpx
 import requests
 import uuid
 import bcrypt
@@ -36,6 +37,8 @@ from database import get_session
 from utils import store_logo, get_tool_id
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+
+CONNECTOR_SALT = os.getenv("CONNECTOR_SALT", "$2b$12$RUWL7I0Nk/n3ohBgomOOO.")
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")  # use env and rotate in prod
 JWT_ALGO = "HS256"
 
@@ -105,6 +108,45 @@ def get_auth_token(
     return server_token
 
 
+def get_token(server_id: str):
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=15)
+    token = jwt.encode({
+        "sub": f"server:{server_id}",
+        "iat": now.timestamp(),
+        "exp": exp.timestamp(),
+    }, JWT_SECRET, algorithm=JWT_ALGO)
+
+    return {"access_token": token, "expires_at": exp.isoformat()}
+
+
+def verify_token(token: HTTPAuthorizationCredentials = Depends(token_header)):
+    try:
+        payload = jwt.decode(
+            token.credentials, JWT_SECRET, algorithms=[JWT_ALGO])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def verify_connector_token(
+    connector_id: str,
+    token: HTTPAuthorizationCredentials = Depends(token_header),
+    session: Session = Depends(get_session)
+) -> McpConnector | None:
+    secret_hash = bcrypt.hashpw(token.credentials.encode(), CONNECTOR_SALT.encode())
+    print(f"Secret hash: {secret_hash}")
+    connector = session.exec(select(
+        McpConnector).where(
+            McpConnector.id == connector_id,
+            McpConnector.secret == secret_hash)).first()
+    if not connector:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    return connector
+
+
 def get_all_connectors(session: Session):
     connectors = session.exec(
                     select(McpConnector)
@@ -138,7 +180,8 @@ def get_user_accessible_connectors(session: Session, user: User) -> List[McpConn
     """Get connectors that the user has access to."""
     if is_superuser(user):
         # Superusers can see all connectors
-        return session.exec(select(McpConnector).where(McpConnector.is_active.is_(True))).all()
+        return session.exec(
+            select(McpConnector).where(McpConnector.is_active.is_(True))).all()
     else:
         # Regular users can only see connectors they have access to
         statement = select(McpConnector).join(ConnectorAccess).where(
@@ -263,6 +306,11 @@ def register_connector(req: RegisterRequest, session: Session = Depends(get_sess
     return {"connector_id": connector.id, "secret": secret}
 
 
+@router.get("/quick-token-verify")
+def quick_token_verify(_: str = Depends(verify_token)):
+    return {"message": "Token verified"}
+
+
 @router.get("/connectors")
 def get_connectors(
     session: Session = Depends(get_session),
@@ -301,14 +349,13 @@ def get_connectors(
 
 # get all active servers based on connector id
 @router.get("/connectors/{connector_id}/servers")
-def get_servers(connector_id: str, session: Session = Depends(get_session)) -> List[dict]:
+def get_servers(
+    connector: McpConnector = Depends(verify_connector_token)
+) -> dict:
     """
     Get all active servers based on connector id.
     """
-    return session.exec(
-        select(McpServer).where(
-            McpServer.connector_id == connector_id,
-            McpServer.is_active.is_(True))).all()
+    return {server.id: server.configuration for server in connector.servers}
 
 
 @router.post("/connectors/register")
@@ -381,7 +428,7 @@ def register_connector(
 
 @router.post("/connectors/activate")
 def activate_connector(
-    request: CreateConnectorRequest, 
+    request: CreateConnectorRequest,
     session: Session = Depends(get_session),
     current_user: User = Depends(require_superuser())
 ) -> dict:
@@ -408,7 +455,7 @@ def activate_connector(
         
         # Fetch connector schema from URL
         try:
-            req = requests.get(request.connector_url, timeout=10)
+            req = requests.get(f"{request.connector_url}/connector.json", timeout=10)
             if req.status_code != 200:
                 raise HTTPException(
                     status_code=400,
@@ -546,7 +593,7 @@ def create_connector(
     DEPRECATED: Use /connectors/register and /connectors/activate instead.
     This endpoint is kept for backward compatibility.
     """
-    req = requests.get(request.connector_url)
+    req = requests.get(f"{request.connector_url}/connector.json")
     if req.status_code != 200:
         raise HTTPException(status_code=400, detail="Failed to get connector schema")
     connector_data = req.json()
@@ -556,14 +603,6 @@ def create_connector(
     tools = connector_data.get("tools", [])
     templates = connector_data.get("templates", {})
     server_config = connector_data.get("config", {})
-    
-    # Convert tools to McpConnectorToolItem objects
-    # from datatypes import McpConnectorToolItem
-    # tools_config = [McpConnectorToolItem(**tool) for tool in tools]
-    
-    # # Convert templates to McpServerTemplateItem objects
-    # from datatypes import McpServerTemplateItem
-    # templates_config = [McpServerTemplateItem(**template) for template in templates]
 
     connector_data = {
         "url": request.connector_url,
@@ -633,8 +672,13 @@ def delete_connector(
         
         connector_name = connector.name
         
-        # Delete the connector - CASCADE will handle both servers and access grants automatically
-        session.delete(connector)
+        # Delete the connector using direct SQL to ensure CASCADE DELETE works properly
+        # This bypasses SQLAlchemy's relationship management that might try to set FK to NULL
+        from sqlalchemy import text
+        session.execute(
+            text("DELETE FROM mcp_connectors WHERE id = :connector_id"),
+            {"connector_id": connector_id}
+        )
         session.commit()
         
         return {
@@ -934,7 +978,7 @@ def create_server(
     
     # Check if user has access to this connector
     connector = check_connector_access(session, current_user, connector_id)
-    
+    server_data["server_url"] = connector.url
     mcp_server = McpServer(**server_data, connector_id=connector_id, user_id=current_user.id)
     session.add(mcp_server)
     session.commit()
@@ -966,6 +1010,15 @@ def create_server(
     session.add(token)
     session.commit()
     session.refresh(token)
+
+    token_data = get_token(mcp_server.id)
+
+    with httpx.Client(timeout=20) as client:
+        response = client.post(
+            f"{mcp_server.server_url}/create-server/{mcp_server.id}",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"}
+        )
+        print(response.json())
 
     return {
         "status": "created",
@@ -1122,7 +1175,7 @@ def update_server(
 
 @router.delete("/servers/{server_id}")
 def delete_server(
-    server_id: int,
+    server_id: str,
     session: Session = Depends(get_session)
 ) -> dict:
     """
@@ -1177,7 +1230,7 @@ def delete_server(
 
 @router.get("/servers/{server_id}/tokens")
 def get_server_tokens(
-    server_id: int,
+    server_id: str,
     session: Session = Depends(get_session)
 ) -> List[dict]:
     """
@@ -1320,7 +1373,7 @@ def get_server_tools(
 
 @router.patch("/servers/{server_id}/tools/{tool_id}")
 def update_tool_status(
-    server_id: int,
+    server_id: str,
     tool_id: int,
     update_data: dict,
     session: Session = Depends(get_session)

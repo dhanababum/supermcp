@@ -1,9 +1,10 @@
 import requests
-from api.config import LogoStorageType, settings
 import os
 from starlette.responses import FileResponse
 from PIL import Image
 from io import BytesIO
+
+from config import LogoStorageType, settings
 
 
 def store_logo(source_logo_url: str, name: str):

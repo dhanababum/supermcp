@@ -71,6 +71,7 @@ class McpConnector(SQLModel, table=True):
     
     # One-to-many relationship: one connector has many access records
     access_records: List["ConnectorAccess"] = Relationship(back_populates="connector")
+    servers: List["McpServer"] = Relationship(back_populates="connector")
 
     class Config:
         arbitrary_types_allowed = True
@@ -141,6 +142,9 @@ class McpServer(SQLModel, table=True):
     
     # Many-to-one relationship: many servers belong to one user
     # user: Optional[User] = Relationship(back_populates="servers")  # Disabled due to mixed base classes
+    
+    # Many-to-one relationship: many servers belong to one connector
+    connector: Optional[McpConnector] = Relationship(back_populates="servers")
     
     # One-to-many relationship: one server has many tokens
     tokens: List["McpServerToken"] = Relationship(back_populates="server")
