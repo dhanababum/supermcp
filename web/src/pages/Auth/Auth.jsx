@@ -3,35 +3,17 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import SignupForm from './components/SignupForm';
 import { formatError, extractFieldErrors, mapApiFieldToFormField } from '../../utils/errorUtils';
+import { api } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login: authLogin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLogin, setIsLogin] = useState(true);
-
-  // Check if user is already authenticated
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        const response = await fetch('http://localhost:9000/users/me', {
-          credentials: 'include', // Include cookies
-        });
-        
-        if (response.ok) {
-          // User is already authenticated, redirect to dashboard
-          navigate('/dashboard');
-        }
-      } catch (error) {
-        // User is not authenticated, stay on auth page
-        console.log('User not authenticated');
-      }
-    };
-    
-    checkAuthStatus();
-  }, [navigate]);
 
   // Update form type based on URL
   useEffect(() => {
@@ -45,75 +27,27 @@ const Auth = () => {
     setFieldErrors({});
 
     try {
-      // Create URLSearchParams for application/x-www-form-urlencoded format
-      // This matches the cURL command format
-      const formBody = new URLSearchParams();
-      formBody.append('username', formData.email);
-      formBody.append('password', formData.password);
-
-      // Debug: Log what we're sending
-      console.log('Sending form-encoded login request with:', {
+      console.log('🔐 Attempting login with:', {
         username: formData.email,
-        password: '***' // Don't log actual password
+        password: '***'
       });
 
-      const response = await fetch('http://localhost:9000/auth/cookie/login', {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        credentials: 'include', // Include cookies for CookieTransport
-        body: formBody.toString(),
-      });
+      // Use AuthContext's login function
+      const result = await authLogin(formData);
+      console.log('📡 Login result:', result);
 
-      console.log('Login response status:', response.status);
-
-      if (response.ok) {
-        // Login successful
-        // Note: fastapi-users cookie login returns 204 No Content (no body)
-        console.log('Login successful - cookie set');
-        
-        // Notify useAuth hook to refresh authentication status
-        // window.dispatchEvent(new Event('auth:refresh'));
-        
-        // Wait a moment for the auth state to update before navigating
-         navigate('/dashboard', { replace: true });
+      if (result.success) {
+        // Login successful - AuthContext has updated the auth state
+        console.log('✅ Login successful - redirecting to dashboard');
+        navigate('/dashboard', { replace: true });
       } else {
-        // Only try to parse JSON on error responses
-        const contentType = response.headers.get('content-type');
-        let errorData = { detail: 'Login failed' };
-        
-        if (contentType && contentType.includes('application/json')) {
-          try {
-            errorData = await response.json();
-          } catch (e) {
-            console.error('Failed to parse error response:', e);
-          }
-        }
-        
-        console.log('Login error response:', errorData);
-        
-        // Extract field-specific errors
-        const apiFieldErrors = extractFieldErrors(errorData);
-        const mappedFieldErrors = {};
-        
-        // Map API field names to form field names
-        Object.keys(apiFieldErrors).forEach(apiField => {
-          const formField = mapApiFieldToFormField(apiField);
-          mappedFieldErrors[formField] = apiFieldErrors[apiField];
-        });
-        
-        setFieldErrors(mappedFieldErrors);
-        
-        // Set general error if no field-specific errors
-        if (Object.keys(mappedFieldErrors).length === 0) {
-          setError(formatError(errorData.detail) || 'Login failed');
-        }
+        // Login failed - show error
+        console.log('❌ Login failed:', result.error);
+        setError(result.error || 'Login failed');
       }
     } catch (error) {
-      console.error('Login network error:', error);
-      setError('Network error. Please try again.');
+      console.error('❌ Login error:', error);
+      setError(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -125,14 +59,7 @@ const Auth = () => {
     setFieldErrors({});
 
     try {
-      const response = await fetch('http://localhost:9000/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies
-        body: JSON.stringify(formData),
-      });
+      const response = await api.register(formData);
 
       if (response.ok) {
         // Registration successful, show success message and redirect to login

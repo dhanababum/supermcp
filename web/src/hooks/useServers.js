@@ -1,29 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
 
-export const useServers = (shouldFetch) => {
+export const useServers = (shouldFetch = true) => {
   const [servers, setServers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const isFetchingRef = useRef(false);
 
-  const fetchServers = async () => {
+  const fetchServers = useCallback(async () => {
+    // Prevent duplicate fetches
+    if (isFetchingRef.current) {
+      console.log('⚠️ Servers fetch already in progress, skipping...');
+      return;
+    }
+
+    isFetchingRef.current = true;
     setLoading(true);
     setError(null);
+    
     try {
+      console.log('📡 Fetching servers...');
       const data = await api.getServers();
       setServers(data);
+      console.log('✅ Servers loaded:', data.length);
     } catch (err) {
+      console.error('❌ Error fetching servers:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  };
+  }, []); // Empty dependencies - stable function
 
   useEffect(() => {
     if (shouldFetch) {
       fetchServers();
     }
-  }, [shouldFetch]);
+  }, [shouldFetch, fetchServers]);
 
   return { servers, loading, error, refetch: fetchServers };
 };

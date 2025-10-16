@@ -1,17 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
 
-export const useConnectors = (shouldFetch) => {
+export const useConnectors = (shouldFetch = true) => {
   const [connectors, setConnectors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const isFetchingRef = useRef(false);
 
   const fetchConnectors = useCallback(async () => {
-    if (!shouldFetch) return;
-    
+    // Prevent duplicate fetches
+    if (isFetchingRef.current) {
+      console.log('⚠️ Connectors fetch already in progress, skipping...');
+      return;
+    }
+
+    isFetchingRef.current = true;
     setLoading(true);
     setError(null);
+    
     try {
+      console.log('📡 Fetching connectors...');
       const data = await api.getConnectors();
       // Transform the data to match frontend expectations
       const connectorsList = data.map(connector => ({
@@ -26,16 +34,21 @@ export const useConnectors = (shouldFetch) => {
         updated_at: connector.updated_at
       }));
       setConnectors(connectorsList);
+      console.log('✅ Connectors loaded:', connectorsList.length);
     } catch (err) {
+      console.error('❌ Error fetching connectors:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [shouldFetch]);
+  }, []); // Remove shouldFetch from dependencies
 
   useEffect(() => {
-    fetchConnectors();
-  }, [fetchConnectors]);
+    if (shouldFetch) {
+      fetchConnectors();
+    }
+  }, [shouldFetch, fetchConnectors]);
 
   return { connectors, loading, error, refetch: fetchConnectors };
 };

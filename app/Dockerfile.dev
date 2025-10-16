@@ -1,0 +1,45 @@
+# Development Dockerfile with hot reload support
+FROM python:3.12.2-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PATH="/app/.venv/bin:$PATH" \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gettext-base \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for faster dependency management
+RUN pip install uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install Python dependencies using uv
+RUN uv sync --frozen
+
+# Copy application code
+COPY . .
+
+# Create media directory for logos
+RUN mkdir -p media/logos
+
+# Set proper permissions for migration script (if it exists)
+RUN chmod +x ./migrate.sh
+
+# Expose port
+EXPOSE 9000
+
+# Default command with reload enabled
+CMD ["sh", "entrypoint.sh"]

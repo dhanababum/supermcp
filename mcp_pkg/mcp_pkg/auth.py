@@ -24,7 +24,7 @@ class CustomTokenVerifier(TokenVerifier):
 def verify_token(
     token: HTTPAuthorizationCredentials = Depends(token_header)
 ):
-    with httpx.Client() as client:
+    with httpx.Client(timeout=20) as client:
         response = client.get(
             settings.app_base_url + "/api/quick-token-verify",
             headers={"Authorization": f"Bearer {token.credentials}"})

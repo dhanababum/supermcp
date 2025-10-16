@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { api } from '../../../services/api';
 
 const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
   const [templates, setTemplates] = useState([]);
@@ -27,23 +28,8 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
       setLoading(true);
       setError(null);
       
-      // Fetch templates from the API endpoint
-      const response = await fetch(`http://localhost:9000/api/connectors/${server.connector_id}/templates`);
-      
-      // Check if response is ok
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      // Check content type to ensure we're getting JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Expected JSON but got:', text.substring(0, 200));
-        throw new Error('Server returned HTML instead of JSON. Please check the server URL.');
-      }
-      
-      const data = await response.json();
+      // Fetch templates using the API service
+      const data = await api.getConnectorTemplates(server.connector_id);
       setTemplates(data || []);
     } catch (error) {
       console.error('Error fetching templates:', error);
@@ -157,21 +143,8 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
         template_args: formData || {}
       };
 
-      // Call the API to create the tool using servers/{server_id}/tools endpoint
-      const response = await fetch(`http://localhost:9000/api/servers/${server.id}/tools`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(toolData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create tool');
-      }
-
-      const result = await response.json();
+      // Call the API to create the tool using the API service
+      const result = await api.createServerTool(server.id, toolData);
       console.log('Tool created:', result);
       
       // Call success callback

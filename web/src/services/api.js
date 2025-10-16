@@ -1,4 +1,8 @@
-const API_BASE_URL = 'http://localhost:9000';
+// Use environment variable for API URL, fallback to localhost for development
+const API_BASE_URL = window.APP_CONFIG?.API_BASE_URL || 
+                     process.env.REACT_APP_API_BASE_URL || 
+                     'http://localhost:9000';
+console.log('API_BASE_URL', API_BASE_URL);
 const IGNORE_REDIRECT_ENDPOINTS = ['/auth/cookie/login', '/auth/logout', '/users/me'];
 const API_ROUTES = {
   // Auth endpoints
@@ -170,6 +174,10 @@ export const api = {
     return apiRequest(API_ROUTES.connectorSchema(connectorId));
   },
 
+  getConnectorTemplates: async (connectorId) => {
+    return apiRequest(`/api/connectors/${connectorId}/templates`);
+  },
+
   // Connector Access Management (Superuser only)
   grantConnectorAccess: async (userId, connectorId) => {
     return apiRequest('/api/connectors/grant-access', {
@@ -225,6 +233,13 @@ export const api = {
   // Server Tools
   getServerTools: async (serverId) => {
     return apiRequest(API_ROUTES.serverTools(serverId));
+  },
+
+  createServerTool: async (serverId, toolData) => {
+    return apiRequest(API_ROUTES.serverTools(serverId), {
+      method: 'POST',
+      body: JSON.stringify(toolData),
+    });
   },
 
   // Server Tokens

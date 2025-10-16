@@ -19,110 +19,101 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuthStatus = useCallback(async () => {
+    console.log('🔍 Starting auth check...');
+    
     // Prevent multiple simultaneous auth checks
     if (isCheckingRef.current) {
-      console.log('Auth check already in progress, skipping...');
+      console.log('⚠️ Auth check already in progress, skipping...');
       return;
     }
 
     isCheckingRef.current = true;
-    if (isMountedRef.current) setIsLoading(true);
+    setIsLoading(true);
 
     try {
-      try {
-        const result = await api.getMe();
-        if (!result) {
-          setIsAuthenticated(false);
-          setUser(null);
-          setIsLoading(false);
-          return;
-        } else {
-          setIsAuthenticated(true);
-          setUser(result);
-          setIsLoading(false);
-          console.log('result: Authenticated', result);
-          return;
-        }
-      } catch (error) {
-        console.log('error', error);
-      }
-      // console.log('result', result);
-      // If you want to short-circuit when no cookies exist, uncomment:
-        
+      console.log('📡 Calling api.getMe()...');
+      const result = await api.getMe();
+      console.log('✅ api.getMe() result:', result);
       
-
-      // Defensive handling for different api implementations:
-      // - api.getMe() might throw on 401
-      // - or it might return { ok: true, data: user } / { ok: false, error }
-      // const result = await api.getMe();
-
-      // If api.getMe returns an object with ok/data:
-      
-    } catch (err) {
-      console.warn('Auth verification failed:', err?.message ?? err);
-      if (isMountedRef.current) {
+      if (result) {
+        setIsAuthenticated(true);
+        setUser(result);
+        console.log('✅ User authenticated:', result.email);
+      } else {
         setIsAuthenticated(false);
         setUser(null);
+        console.log('❌ No user data returned');
       }
+    } catch (err) {
+      console.warn('❌ Auth verification failed:', err?.message ?? err);
+      setIsAuthenticated(false);
+      setUser(null);
     } finally {
       isCheckingRef.current = false;
-      if (isMountedRef.current) setIsLoading(false);
+      setIsLoading(false);
+      console.log('🏁 Auth check complete');
     }
   }, []);
 
   // Check auth on mount
   useEffect(() => {
+    console.log('🚀 AuthProvider mounted - checking auth status');
     checkAuthStatus();
   }, [checkAuthStatus]);
 
   const login = useCallback(async (credentials) => {
+    console.log('🔐 Login attempt...');
     try {
-      if (isMountedRef.current) setIsLoading(true);
+      setIsLoading(true);
 
       const response = await api.login(credentials);
+      console.log('📡 Login response:', response);
 
-      // If response uses ok flag:
-      if (response && typeof response === 'object' && 'ok' in response) {
-        if (response.ok) {
-          await checkAuthStatus();
-          return { success: true };
-        } else {
-          return { success: false, error: response.error ?? 'Login failed' };
-        }
+      // Check if login was successful
+      if (response && response.ok) {
+        console.log('✅ Login successful - refreshing auth status');
+        // Wait for auth status to refresh
+        await checkAuthStatus();
+        return { success: true };
       }
 
-      // If login throws on error, we won't reach here on failure.
-      // If it returns something else, assume success and re-check.
-      await checkAuthStatus();
-      return { success: true };
+      // If response doesn't have 'ok' property, assume success and check auth
+      if (!('ok' in response)) {
+        console.log('✅ Login appears successful - refreshing auth status');
+        await checkAuthStatus();
+        return { success: true };
+      }
+
+      // Login failed
+      console.log('❌ Login failed');
+      return { success: false, error: 'Login failed' };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       return { success: false, error: error?.message ?? 'Network error' };
     } finally {
-      if (isMountedRef.current) setIsLoading(false);
+      setIsLoading(false);
     }
   }, [checkAuthStatus]);
 
   const logout = useCallback(async () => {
+    console.log('🚪 Logging out...');
     try {
-      if (isMountedRef.current) setIsLoading(true);
-      // call API; don't rely on it always succeeding
+      setIsLoading(true);
       await api.logout();
     } catch (err) {
-      console.warn('Logout API call failed:', err);
+      console.warn('⚠️ Logout API call failed:', err);
     } finally {
-      if (isMountedRef.current) {
-        setIsAuthenticated(false);
-        setUser(null);
-        setIsLoading(false);
-      }
+      setIsAuthenticated(false);
+      setUser(null);
+      setIsLoading(false);
+      console.log('✅ Logged out');
     }
   }, []);
 
-  // Listen for external auth refresh events (e.g. broadcast channel, other tab)
+  // Listen for external auth refresh events
   useEffect(() => {
     const handleAuthRefresh = async () => {
-      console.log('Auth refresh event received');
+      console.log('🔄 Auth refresh event received');
       await checkAuthStatus();
     };
 
@@ -139,6 +130,13 @@ export const AuthProvider = ({ children }) => {
     if (role === 'superuser') return isSuperuser();
     return false;
   }, [isSuperuser]);
+
+  // Debug logging
+  console.log('📊 AuthProvider state:', { 
+    isAuthenticated, 
+    isLoading, 
+    userEmail: user?.email || 'none' 
+  });
 
   const value = {
     isAuthenticated,

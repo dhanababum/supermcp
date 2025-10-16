@@ -14,13 +14,18 @@ const ProtectedRoute = ({ children }) => {
   const location = useLocation();
 
   React.useEffect(() => {
-    if (isAuthenticated === false || isAuthenticated === null) {
-      navigate('/auth/login', { state: { from: location } });
+    console.log('ProtectedRoute check:', { isAuthenticated, isLoading, path: location.pathname });
+    
+    // Only redirect if we KNOW the user is not authenticated (false, not null)
+    // Don't redirect during loading (null)
+    if (isAuthenticated === false && !isLoading) {
+      console.log('❌ User not authenticated - redirecting to login');
+      navigate('/auth/login', { state: { from: location }, replace: true });
     }
-  }, [isAuthenticated, navigate, location]);
+  }, [isAuthenticated, isLoading, navigate, location]);
 
+  // Show loading spinner while checking auth
   if (isLoading) {
-    // Loading state
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
@@ -28,10 +33,12 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
+  // If not authenticated and not loading, don't render (will redirect)
   if (isAuthenticated === false) {
-    return null; // Will redirect to login
+    return null;
   }
 
+  // If authenticated or still checking, render children
   return children;
 };
 

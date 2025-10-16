@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from enum import Enum
 import os
 
-os.environ["API_BASE_URL"] = "http://localhost:9000"
+os.environ["API_BASE_URL"] = "http://localhost:9001"
 os.environ["API_WEB_URL"] = "http://localhost:3000"
 os.environ["CONNECTOR_SECRET"] = "b6cb409aefdd4338bee0627a6a2c5243"
 os.environ["CONNECTOR_ID"] = "5c91a05f-e9fa-4d8f-8903-b22c544f53aa"
