@@ -1,4 +1,5 @@
 import os
+from re import S
 import httpx
 import requests
 import bcrypt
@@ -10,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict, List
@@ -87,9 +89,12 @@ async def get_token(server_id: str):
     return {"access_token": token, "expires_at": exp.isoformat()}
 
 
-async def verify_token(token: HTTPAuthorizationCredentials = Depends(token_header)):
+async def verify_token(
+    token: HTTPAuthorizationCredentials = Depends(token_header)
+):
     try:
-        payload = jwt.decode(token.credentials, JWT_SECRET, algorithms=[JWT_ALGO])
+        payload = jwt.decode(
+            token.credentials, settings.JWT_SECRET, algorithms=[settings.JWT_ALGO])
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
@@ -355,6 +360,26 @@ async def get_servers(
         server.id: server.configuration for server in servers}
 
 
+@router.get("/connectors/{connector_id}/servers/{server_id}")
+async def get_server(
+    server_id: str,
+    connector: McpConnector = Depends(verify_connector_token),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict:
+    """
+    Get a specific server based on connector id and server id.
+    """
+    result = await session.execute(
+        select(McpServer).where(
+            McpServer.connector_id == connector.id,
+            McpServer.id == server_id,
+            McpServer.is_active.is_(True)
+        )
+    )
+    server = result.scalars().first()
+    return server.configuration
+
+
 @router.post("/connectors/register")
 async def register_connector(
     request: RegisterConnectorRequest,
@@ -444,7 +469,8 @@ async def activate_connector(
     """
     try:
         # Get the registered connector
-        connector = await session.execute(select(McpConnector).where(McpConnector.id == request.connector_id))
+        connector = await session.execute(select(McpConnector).where(
+            McpConnector.id == request.connector_id))
         connector: McpConnector = connector.scalars().first()
 
         if not connector:
@@ -491,11 +517,11 @@ async def activate_connector(
         connector.templates_config = templates
         connector.server_config = server_config
         connector.mode = ConnectorMode.active.value
-        connector.updated_at = datetime.now(timezone.utc)
+        connector.updated_at = datetime.utcnow()
 
         session.add(connector)
-        session.commit()
-        session.refresh(connector)
+        await session.commit()
+        await session.refresh(connector)
 
         # Store logo if available
         if logo_url and logo_url.strip():
@@ -678,20 +704,20 @@ async def delete_connector(
 
         # Count affected resources before deletion (for reporting)
         access_count = await session.execute(
-                select(ConnectorAccess).where(
+                select(func.count(ConnectorAccess.id)).where(
                     ConnectorAccess.connector_id == connector_id,
                     ConnectorAccess.is_active.is_(True),
                 )
             )
-        access_count = access_count.scalars().count()
+        access_count = access_count.scalars()
 
         servers_count = await session.execute(
-                select(McpServer).where(
+                select(func.count(McpServer.id)).where(
                     McpServer.connector_id == connector_id,
                     McpServer.is_active.is_(True),
                 )
             )
-        servers_count = servers_count.scalars().count()
+        servers_count = servers_count.scalars()
 
         connector_name = connector.name
 
@@ -819,7 +845,7 @@ async def revoke_connector_access(
 
 @router.get("/connectors/{connector_id}/access")
 async def get_connector_access(
-    connector_id: int,
+    connector_id: str,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(require_superuser()),
 ) -> List[dict]:

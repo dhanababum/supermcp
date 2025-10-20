@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Header, Query, status
-from dynamic_fastmcp.dynamic_fastmcp import DynamicFastMCP
 from fastmcp import FastMCP
 from fastmcp.server.auth import TokenVerifier, AccessToken
+from starlette.applications import Starlette
 from middleware import AuthMiddleware
 from constants import tokens, mcp_servers
 
@@ -32,7 +32,6 @@ class CustomTokenVerifier(TokenVerifier):
 
 mcp = FastMCP(
     "dynamic-servers",
-    streamable_http_path="/",
     # auth=CustomTokenVerifier(),
     # verify_token=verify_token,
 )
@@ -47,9 +46,9 @@ def hello_tool(name: str, age: int) -> str:
 
 
 mcp_app = mcp.http_app()
-app = FastAPI(lifespan=mcp_app.lifespan)
+app = Starlette(lifespan=mcp_app.lifespan)
 # mcp_app.add_middleware(AuthMiddleware)
-app.add_middleware(AuthMiddleware)
+# app.add_middleware(AuthMiddleware)
 # Mount MCP at different paths for multi-tenant support
 
 

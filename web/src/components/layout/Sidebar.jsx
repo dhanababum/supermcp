@@ -95,30 +95,6 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
           {!collapsed && <span className="ml-3">Logout</span>}
         </button>
       </div>
-
-      {/* What's New Section */}
-      {!collapsed && (
-        <div className="p-4 border-t border-gray-200">
-          <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-3 border border-purple-200">
-            <div className="text-purple-700 text-sm font-semibold mb-2">✨ What's New</div>
-            <div className="space-y-2 text-xs text-gray-600">
-              <div className="flex items-center space-x-2">
-                <InfoIcon />
-                <span>2FA security</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <InfoIcon />
-                <span>Bare trusts & SPVs</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <InfoIcon />
-                <span>Reporting</span>
-              </div>
-            </div>
-            <div className="mt-2 text-xs text-gray-400">version: 0d5ba1f5</div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

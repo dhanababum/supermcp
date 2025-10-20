@@ -83,12 +83,12 @@ class AuthRequest(BaseModel):
 
 class GrantConnectorAccessRequest(BaseModel):
     user_id: uuid.UUID
-    connector_id: int
+    connector_id: str
 
 
 class RevokeConnectorAccessRequest(BaseModel):
     user_id: uuid.UUID
-    connector_id: int
+    connector_id: str
 
 
 class UpdateUserRoleRequest(BaseModel):

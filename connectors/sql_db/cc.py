@@ -1,4 +1,5 @@
-from mcp_pkg.dynamic_mcp import create_dynamic_mcp
+from tarfile import data_filter
+from mcp_pkg.dynamic_mcp import create_dynamic_mcp, get_current_server_id
 from pydantic import BaseModel, Field
 from enum import Enum
 import os
@@ -33,7 +34,7 @@ class SelectQueryTemplate(BaseModel):
     query: str = Field(description="The query to execute")
 
 
-mcp, mcp_app, app = create_dynamic_mcp(
+mcp, app = create_dynamic_mcp(
     name="sql_db",
     config=CustomQueryConnector,
     version="1.0.0",
@@ -41,9 +42,45 @@ mcp, mcp_app, app = create_dynamic_mcp(
 )
 
 
+db_connections = {}
+
+
+@mcp.on_server_create()
+async def handle_server_created(server_id: str, server_data: dict):
+    """Called when a new server is created"""
+    print(f"🚀 Server {server_id} created! Initializing database...")
+    print(f"Server data: {server_data}")
+    db_type = server_data.get("type_connection", "sqlite")
+    host = server_data.get("host", "localhost")
+    try:
+        db_connections[server_id] = {
+            "type": db_type,
+            "host": host,
+            "status": "connected"
+        }
+        print(f"✅ Database initialized for server {server_id}")
+    except Exception as e:
+        print(f"❌ Failed to initialize database for {server_id}: {e}")
+
+
+@mcp.on_server_destroy()
+async def handle_server_destroyed(server_id: str):
+    """Called when a server is destroyed"""
+    print(f"🗑️  Server {server_id} destroyed! Cleaning up database...")
+
+    if server_id in db_connections:
+        try:
+            del db_connections[server_id]
+            print(f"✅ Database cleaned up for server {server_id}")
+        except Exception as e:
+            print(f"❌ Failed to cleanup database for {server_id}: {e}")
+
+
 @mcp.tool()
 def get_sql_db_config(num: int) -> str:
-    return f"Hello, {num}!"
+    server_id = get_current_server_id()
+    print(db_connections[server_id])
+    return f"Hello, {num}! Server ID: {server_id}"
 
 
 @mcp.template(name="get_sql_db_config", params_model=GetSqlDbConfigTemplate)
@@ -58,4 +95,5 @@ def select_query_template(params: SelectQueryTemplate, **kwargs) -> str:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("cc:app", host="0.0.0.0", port=8025, reload=True)
+    # Pass the app object directly, not as a string
+    uvicorn.run(app, host="0.0.0.0", port=8025, reload=False)

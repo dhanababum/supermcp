@@ -1,18 +1,15 @@
 from ast import List
-from functools import partial
-from dynamic_fastmcp.dynamic_fastmcp import MCPTool
 import httpx
 from fastmcp.server.middleware.middleware import (
     Middleware, MiddlewareContext, CallNext
 )
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.tools import Tool
-from fastmcp.tools.tool_transform import TransformedTool
 from fastmcp.exceptions import ToolError
-from fastmcp.tools.tool import ToolResult
+from fastmcp.tools.tool import ToolResult, MCPTool
 from mcp.types import TextContent
 
-from .schema import ToolTemplate, AppServerTool, ToolType
+from .schema import AppServerTool, ToolType
 from .config import settings
 
 
@@ -26,7 +23,6 @@ class CustomToolMiddleware(Middleware):
     async def on_call_tool(
         self, context: MiddlewareContext, call_next: CallNext
     ):
-        print(f"On call tool................ {context}")
         access_token = get_access_token()
 
         app_server_tool: AppServerTool = await self.get_tool_by_name(
@@ -47,36 +43,24 @@ class CustomToolMiddleware(Middleware):
         elif not app_server_tool:
             raise ToolError(
                 f"Access denied to private tool: {context.message.name}")
-        print(f"Context: {context}")
-        print(f"Access token: {access_token}")
         tool: MCPTool = await call_next(context)
         return tool
 
     async def on_list_tools(
         self, context: MiddlewareContext, call_next: CallNext
     ):
-        # fastmcp_context = context.fastmcp_contsext.fastmcp
         access_token = get_access_token()
         online_tools: List[AppServerTool] = await self.get_active_tools(
             access_token.token)
         static_tools = set()
+        server_tools = await call_next(context)
+        new_tools = []
         for app_server_tool in online_tools:
             app_server_tool: AppServerTool = app_server_tool
             tool: MCPTool = app_server_tool.tool
             if app_server_tool.tool_type == ToolType.static:
                 static_tools.add(tool.name)
-        server_tools = await call_next(context)
-        new_tools = []
-        for tool in server_tools:
-            if tool.name in static_tools:
-                new_tools.append(tool)
-        for app_server_tool in online_tools:
-            app_server_tool: AppServerTool = app_server_tool
-            tool: MCPTool = app_server_tool.tool
-            if app_server_tool.tool_type == ToolType.dynamic:
-                # template_name = app_server_tool.template_name
-                # template: ToolTemplate = fastmcp_context.get_template(
-                #     template_name)
+            else:
                 new_tool = Tool(
                     name=tool.name,
                     parameters=tool.inputSchema,
@@ -84,20 +68,12 @@ class CustomToolMiddleware(Middleware):
                     annotations=tool.annotations,
                     meta=tool.meta,
                 )
-                print(f"Tool: {new_tools}")
-                # import ipdb; ipdb.set_trace()
-                # new_tools.append(TransformedTool.from_tool(
-                #     new_tool,
-                #     transform_fn=partial(
-                #         template.template_fn, **app_server_tool.template_args),
-                #     annotations=tool.annotations,
-                #     meta=tool.meta,
-                # ))
                 new_tools.append(new_tool)
-                
-        # import pdb; pdb.set_trace()
+        for tool in server_tools:
+            if tool.name in static_tools:
+                new_tools.append(tool)
         return new_tools
-    
+
     async def get_active_tools(self, access_token: str):
         async with httpx.AsyncClient() as client:
             response = await client.get(

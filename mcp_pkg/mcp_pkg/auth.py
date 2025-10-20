@@ -2,9 +2,11 @@ from fastmcp.server.auth import TokenVerifier, AccessToken
 import httpx
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.requests import Request
 from .config import settings
 
 token_header = HTTPBearer()
+
 
 class CustomTokenVerifier(TokenVerifier):
     async def verify_token(self, token: str) -> AccessToken | None:
@@ -21,14 +23,14 @@ class CustomTokenVerifier(TokenVerifier):
         )
 
 
-def verify_token(
-    token: HTTPAuthorizationCredentials = Depends(token_header)
+async def verify_token(
+    request: Request
 ):
-    with httpx.Client(timeout=20) as client:
-        response = client.get(
+    token = request.headers.get("Authorization").replace("Bearer ", "")
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(
             settings.app_base_url + "/api/quick-token-verify",
-            headers={"Authorization": f"Bearer {token.credentials}"})
+            headers={"Authorization": f"Bearer {token}"})
         if response.status_code != 200:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
-        return response.json()
+        return await response.json()
