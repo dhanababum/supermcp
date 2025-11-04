@@ -2,13 +2,18 @@ import React, { useState, useEffect } from 'react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import { api } from '../../../services/api';
+import Notification from '../../../components/common/Notification';
 
 const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
   const [schema, setSchema] = useState(null);
+  const [uiSchema, setUiSchema] = useState({});
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({});
   const [serverName, setServerName] = useState('');
   const [tokenExpiresAt, setTokenExpiresAt] = useState('');
+  const [notification, setNotification] = useState(null);
+  const [showTokenModal, setShowTokenModal] = useState(false);
+  const [createdServer, setCreatedServer] = useState(null);
 
   useEffect(() => {
     if (connector) {
@@ -17,22 +22,55 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
         .then((connectorConfig) => {
           // Extract the actual schema from the config structure
           // The connector config has this structure:
-          // { params: { properties: {...}, required: [...], ... } }
+          // { params: { properties: {...}, required: [...], ... }, ui_schema: {...} }
           // or just the schema directly
           let extractedSchema = connectorConfig;
+          let extractedUiSchema = {};
           
           // If config has a 'params' property, use that as the schema
           if (connectorConfig && connectorConfig.params) {
             extractedSchema = connectorConfig.params;
           }
           
-          console.log('Connector config:', connectorConfig);
-          console.log('Extracted schema:', extractedSchema);
+          // Extract UI schema if available
+          if (connectorConfig && connectorConfig.ui_schema) {
+            extractedUiSchema = connectorConfig.ui_schema;
+          }
+          
+          // Preprocess schema to fix anyOf patterns for Optional fields
+          // Pydantic generates anyOf: [{type: X}, {type: null}] for Optional[X]
+          // But RJSF widgets like 'password' don't work with anyOf
+          if (extractedSchema && extractedSchema.properties) {
+            Object.keys(extractedSchema.properties).forEach(key => {
+              const prop = extractedSchema.properties[key];
+              
+              // If property has anyOf with [type, null], simplify it
+              if (prop.anyOf && Array.isArray(prop.anyOf)) {
+                // Find non-null type
+                const nonNullType = prop.anyOf.find(t => t.type !== 'null');
+                if (nonNullType) {
+                  // Replace the property with the non-null type
+                  // Keep other properties like title, description, default
+                  extractedSchema.properties[key] = {
+                    ...nonNullType,
+                    title: prop.title,
+                    description: prop.description,
+                    default: prop.default
+                  };
+                }
+              }
+            });
+          }
+          
           setSchema(extractedSchema);
+          setUiSchema(extractedUiSchema);
         })
         .catch((error) => {
           console.error('Error fetching schema:', error);
-          alert('Failed to load connector schema: ' + error.message);
+          setNotification({
+            type: 'error',
+            message: `Failed to load connector schema: ${error.message}`
+          });
         })
         .finally(() => setLoading(false));
     }
@@ -40,7 +78,10 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
 
   const handleFormSubmit = ({ formData: data }) => {
     if (!serverName.trim()) {
-      alert('⚠️ Please enter a server name');
+      setNotification({
+        type: 'warning',
+        message: 'Please enter a server name'
+      });
       return;
     }
 
@@ -51,26 +92,37 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
       token_expires_at: tokenExpiresAt || null
     };
 
+    setLoading(true);
     api.createServer(serverData)
       .then((response) => {
-        const message = [
-          `✅ ${response.message}`,
-          ``,
-          `Server ID: ${response.server_id}`,
-          `Connector: ${response.connector_id}`,
-          `Server Name: ${response.server_name}`,
-          `Token: ${response.token}`,
-          ``,
-          `⚠️ Please save this token securely. It won't be shown again!`
-        ].join('\n');
-        alert(message);
+        setCreatedServer(response);
+        setShowTokenModal(true);
         onSuccess();
-        onClose();
       })
       .catch((error) => {
         console.error('Error creating server:', error);
-        alert(`❌ Failed to create server: ${error.message}\n\nPlease check that the database is running and configured correctly.`);
+        setNotification({
+          type: 'error',
+          message: `Failed to create server: ${error.message}. Please check that the database is running and configured correctly.`
+        });
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const handleCopyToken = () => {
+    if (createdServer?.token) {
+      navigator.clipboard.writeText(createdServer.token);
+      setNotification({
+        type: 'success',
+        message: 'Token copied to clipboard!'
       });
+    }
+  };
+
+  const handleCloseTokenModal = () => {
+    setShowTokenModal(false);
+    setCreatedServer(null);
+    onClose();
   };
 
   if (!connector) return null;
@@ -165,6 +217,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
                     onChange={(e) => setFormData(e.formData)}
                     onSubmit={handleFormSubmit}
                     uiSchema={{
+                      ...uiSchema,
                       'ui:submitButtonOptions': {
                         norender: true
                       }
@@ -205,6 +258,98 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
           )}
         </div>
       </div>
+
+      {/* Token Display Modal */}
+      {showTokenModal && createdServer && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-75" onClick={handleCloseTokenModal}></div>
+            
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
+              <div className="mb-4">
+                <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mx-auto mb-4">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 text-center mb-2">
+                  Server Created Successfully!
+                </h3>
+                <p className="text-sm text-gray-600 text-center">
+                  Your server has been created. Please save the token below securely.
+                </p>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Server Name</p>
+                      <p className="text-sm font-medium text-gray-900">{createdServer.server_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Server ID</p>
+                      <p className="text-sm font-medium text-gray-900">{createdServer.server_id}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-yellow-800 mb-1">Important: Save this token</p>
+                      <p className="text-sm text-yellow-700">
+                        This token will only be shown once. Make sure to copy and store it securely.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs text-gray-500 mb-2">Access Token</p>
+                  <div className="flex items-center space-x-2">
+                    <code className="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm font-mono text-gray-900 overflow-x-auto">
+                      {createdServer.token}
+                    </code>
+                    <button
+                      onClick={handleCopyToken}
+                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                      title="Copy token"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleCloseTokenModal}
+                  className="px-6 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification */}
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={4000}
+          onClose={() => setNotification(null)}
+        />
+      )}
     </div>
   );
 };

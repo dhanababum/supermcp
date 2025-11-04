@@ -27,26 +27,18 @@ const Auth = () => {
     setFieldErrors({});
 
     try {
-      console.log('🔐 Attempting login with:', {
-        username: formData.email,
-        password: '***'
-      });
 
       // Use AuthContext's login function
       const result = await authLogin(formData);
-      console.log('📡 Login result:', result);
 
       if (result.success) {
         // Login successful - AuthContext has updated the auth state
-        console.log('✅ Login successful - redirecting to dashboard');
         navigate('/dashboard', { replace: true });
       } else {
         // Login failed - show error
-        console.log('❌ Login failed:', result.error);
         setError(result.error || 'Login failed');
       }
     } catch (error) {
-      console.error('❌ Login error:', error);
       setError(error.message || 'Login failed');
     } finally {
       setLoading(false);

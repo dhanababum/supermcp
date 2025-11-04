@@ -1,5 +1,5 @@
-from pydantic import ConfigDict, BaseModel, PrivateAttr
-from typing import Callable, Any, Optional, Type
+from pydantic import ConfigDict, BaseModel, PrivateAttr, Field
+from typing import Callable, Any, Optional, Type, Dict
 from enum import Enum
 
 from fastmcp.tools.tool import MCPTool
@@ -56,4 +56,8 @@ class AppServerTool(BaseModel):
 
 class ConnectorConfig(BaseModel):
     params: Type[BaseModel] | dict
+    ui_schema: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="UI Schema hints for form rendering (RJSF uiSchema format)"
+    )
     model_config = ConfigDict(extra="forbid")

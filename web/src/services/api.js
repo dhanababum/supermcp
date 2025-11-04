@@ -2,7 +2,6 @@
 const API_BASE_URL = window.APP_CONFIG?.API_BASE_URL || 
                      process.env.REACT_APP_API_BASE_URL || 
                      'http://localhost:9000';
-console.log('API_BASE_URL', API_BASE_URL);
 const IGNORE_REDIRECT_ENDPOINTS = ['/auth/cookie/login', '/auth/logout', '/users/me'];
 const API_ROUTES = {
   // Auth endpoints
@@ -43,7 +42,6 @@ const apiRequest = async (endpoint, options = {}) => {
   };
 
   try {
-    console.log(`API Request: ${options.method || 'GET'} ${endpoint}`);
     const response = await fetch(url, fetchOptions);
 
     // Special case: form-encoded login request

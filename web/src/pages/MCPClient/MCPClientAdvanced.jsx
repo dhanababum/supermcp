@@ -42,13 +42,6 @@ const MCPClientAdvanced = () => {
   }, []);
 
   const handleServerTokenSelect = async (server, token) => {
-    console.log('handleServerTokenSelect called with:', { 
-      server: server?.server_name, 
-      token: token ? `${token.token.substring(0, 20)}...` : 'null' 
-    });
-
-    console.log('server############## ', server);
-    
     // If we're currently connected, disconnect first
     if (isConnected) {
       try {
@@ -83,13 +76,6 @@ const MCPClientAdvanced = () => {
     addMessage('system', '💡 Tip: Make sure your MCP server is running and accessible.');
   }, [addMessage]);
 
-  // Debug selectedToken changes
-  useEffect(() => {
-    const tokenPreview = selectedToken && typeof selectedToken.token === 'string' 
-      ? `${selectedToken.token.substring(0, 20)}...` 
-      : 'null';
-    console.log('selectedToken changed:', tokenPreview);
-  }, [selectedToken]);
 
   // Update available tools when they change from the hook
   useEffect(() => {
@@ -320,8 +306,6 @@ const MCPClientAdvanced = () => {
       // Convert tool arguments to proper types based on schema
       const convertedArguments = convertArgumentsToProperTypes(currentToolArgs, selectedTool.inputSchema);
       
-      console.log('Original arguments:', currentToolArgs);
-      console.log('Converted arguments:', convertedArguments);
       
       const result = await callTool(selectedTool.name, convertedArguments);
       addMessage('server', `Tool result: ${JSON.stringify(result, null, 2)}`);

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import SuperuserActions from './SuperuserActions';
 import { api } from '../../../services/api';
+import Notification from '../../../components/common/Notification';
 
 const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegisterUrl }) => {
   const { isSuperuser } = useAuth();
   const [updating, setUpdating] = useState(false);
+  const [notification, setNotification] = useState(null);
   
   // Determine mode status
   const mode = connector.mode || 'unknown';
@@ -22,21 +24,41 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
     try {
       // Update connector mode via API
       await api.updateConnectorMode(connector.id, newMode);
+      
+      setNotification({
+        type: 'success',
+        message: `Connector mode updated to ${newMode}`
+      });
+      
       // Trigger refresh
       if (onDelete) {
         onDelete(); // This triggers refetch in parent
       }
     } catch (error) {
       console.error('Failed to update connector mode:', error);
-      alert(`Failed to update mode: ${error.message}`);
+      setNotification({
+        type: 'error',
+        message: `Failed to update mode: ${error.message}`
+      });
     } finally {
       setUpdating(false);
     }
   };
   
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-start justify-between mb-4">
+    <>
+      {/* Notification */}
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={4000}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
+      <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+        <div className="flex items-start justify-between mb-4">
         <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
@@ -162,7 +184,8 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

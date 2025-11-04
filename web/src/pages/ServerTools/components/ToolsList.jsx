@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ToolTemplateModal from './ToolTemplateModal';
 import ConfirmationModal from '../../../components/ConfirmationModal';
+import Notification from '../../../components/common/Notification';
 
 const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, server }) => {
   const [updatingToolId, setUpdatingToolId] = useState(null);
@@ -9,6 +10,7 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [toolToDelete, setToolToDelete] = useState(null);
   const [deletingToolId, setDeletingToolId] = useState(null);
+  const [notification, setNotification] = useState(null);
 
   // Update local tools when props change
   React.useEffect(() => {
@@ -54,14 +56,17 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to delete tool');
       }
-
-      const data = await response.json();
-      console.log('Tool deleted:', data);
       
       // Remove tool from local state
       setLocalTools(prevTools => 
         prevTools.filter(t => t.id !== toolToDelete.id)
       );
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: `Tool "${toolToDelete.name}" deleted successfully`
+      });
       
       // Close modal
       setShowDeleteModal(false);
@@ -69,7 +74,16 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
       
     } catch (error) {
       console.error('Error deleting tool:', error);
-      alert(`Failed to delete tool: ${error.message}`);
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: `Failed to delete tool: ${error.message}`
+      });
+      
+      // Close modal on error too
+      setShowDeleteModal(false);
+      setToolToDelete(null);
     } finally {
       setDeletingToolId(null);
     }
@@ -119,16 +133,32 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
           t.id === tool.id ? { ...t, is_active: tool.is_active } : t
         )
       );
-      alert(`Failed to update tool status: ${error.message}`);
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: `Failed to update tool status: ${error.message}`
+      });
     } finally {
       setUpdatingToolId(null);
     }
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Available Tools</h2>
+    <>
+      {/* Notification Toast */}
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={4000}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Available Tools</h2>
         <button
           onClick={handleCreateTool}
           className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 flex items-center space-x-2"
@@ -263,7 +293,8 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
         cancelText="Cancel"
         isDestructive={true}
       />
-    </div>
+      </div>
+    </>
   );
 };
 

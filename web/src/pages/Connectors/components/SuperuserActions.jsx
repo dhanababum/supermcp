@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { api } from '../../../services/api';
 import UserSearchModal from './UserSearchModal';
 import { Notification } from '../../../components/common';
+import ConfirmationModal from '../../../components/ConfirmationModal';
 
 const SuperuserActions = ({ connector, onAccessUpdate }) => {
   const [showAccessModal, setShowAccessModal] = useState(false);
@@ -10,6 +11,9 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRevokeModal, setShowRevokeModal] = useState(false);
+  const [userToRevoke, setUserToRevoke] = useState(null);
 
   const handleManageAccess = async () => {
     setLoading(true);
@@ -48,13 +52,18 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
     });
   };
 
-  const handleRevokeAccess = async (userId) => {
-    if (!window.confirm('Are you sure you want to revoke access for this user?')) {
-      return;
-    }
+  const handleRevokeClick = (userId) => {
+    setUserToRevoke(userId);
+    setShowRevokeModal(true);
+  };
+
+  const handleConfirmRevoke = async () => {
+    if (!userToRevoke) return;
+
+    setShowRevokeModal(false);
 
     try {
-      await api.revokeConnectorAccess(userId, connector.id);
+      await api.revokeConnectorAccess(userToRevoke, connector.id);
       // Refresh the access list
       await handleManageAccess();
       if (onAccessUpdate) {
@@ -71,22 +80,29 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
         type: 'error'
       });
       console.error('Revoke access error:', err);
+    } finally {
+      setUserToRevoke(null);
     }
   };
 
-  const handleDeleteConnector = async () => {
-    const confirmMessage = `Are you sure you want to delete "${connector.name}"?\n\nThis will:\n• Remove the connector\n• Revoke all user access\n• Disable all servers using this connector\n\nThis action cannot be undone.`;
-    
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+  const handleCancelRevoke = () => {
+    setShowRevokeModal(false);
+    setUserToRevoke(null);
+  };
 
+  const handleDeleteClick = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setShowDeleteModal(false);
     setLoading(true);
+
     try {
       const result = await api.deleteConnector(connector.id);
       
       setNotification({
-        message: `${result.message}\n• Revoked access: ${result.revoked_access} users\n• Disabled servers: ${result.disabled_servers}`,
+        message: `${result.message} • Revoked access: ${result.revoked_access} users • Disabled servers: ${result.disabled_servers}`,
         type: 'success'
       });
       
@@ -107,6 +123,10 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
     }
   };
 
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+  };
+
   return (
     <>
       <div className="flex items-center space-x-2">
@@ -118,7 +138,7 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
           {loading ? 'Loading...' : 'Manage Access'}
         </button>
         <button
-          onClick={handleDeleteConnector}
+          onClick={handleDeleteClick}
           disabled={loading}
           className="flex-1 px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors disabled:opacity-50 flex items-center justify-center space-x-1"
           title="Delete connector"
@@ -185,7 +205,7 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
                           </p>
                         </div>
                         <button
-                          onClick={() => handleRevokeAccess(access.user_id)}
+                          onClick={() => handleRevokeClick(access.user_id)}
                           className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
                         >
                           Revoke
@@ -235,6 +255,30 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
         onUserSelect={handleUserGranted}
         connectorId={connector.id}
         existingAccess={accessList}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Delete Connector"
+        message={`Are you sure you want to delete "${connector.name}"? This will remove the connector, revoke all user access, and disable all servers using this connector. This action cannot be undone.`}
+        confirmText="Delete Connector"
+        cancelText="Cancel"
+        isDestructive={true}
+      />
+
+      {/* Revoke Access Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showRevokeModal}
+        onClose={handleCancelRevoke}
+        onConfirm={handleConfirmRevoke}
+        title="Revoke Access"
+        message="Are you sure you want to revoke access for this user? They will no longer be able to use this connector."
+        confirmText="Revoke Access"
+        cancelText="Cancel"
+        isDestructive={true}
       />
 
       {/* Notification */}

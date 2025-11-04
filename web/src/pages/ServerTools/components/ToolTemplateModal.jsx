@@ -145,7 +145,6 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
 
       // Call the API to create the tool using the API service
       const result = await api.createServerTool(server.id, toolData);
-      console.log('Tool created:', result);
       
       // Call success callback
       if (onSuccess) {

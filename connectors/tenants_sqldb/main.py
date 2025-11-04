@@ -1,48 +1,26 @@
 """Tenants SQL Database MCP Connector - Main Entry Point"""
-import json
-from mcp_pkg.dynamic_mcp import create_dynamic_mcp, get_current_server_config, get_current_server_id
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+
+from mcp_pkg.dynamic_mcp import (
+    create_dynamic_mcp,
+    get_current_server_id
+)
+from typing import Dict, Any
 import os
 import logging
+import re
 
-from schema import TenantSqlDbConfig
-from db_manager import DatabaseConnectionManager, DatabaseType
+from schema import (
+    SelectQueryTemplate,
+    InsertQueryTemplate,
+    ExecuteQueryParams,
+    TenantSqlDbConfig,
+)
+from db_manager import DatabaseConnectionManager
 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Environment configuration
-
-class ExecuteQueryParams(BaseModel):
-    """Parameters for executing a SQL query"""
-    query: str = Field(description="SQL query to execute")
-    params: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Query parameters for parameterized queries"
-    )
-
-
-class GetTableSchemaParams(BaseModel):
-    """Parameters for getting table schema"""
-    table_name: str = Field(description="Name of the table to inspect")
-
-
-class SelectQueryTemplate(BaseModel):
-    """Template for SELECT queries"""
-    table_name: str = Field(description="Table name to query")
-    columns: str = Field(default="*", description="Columns to select (comma-separated)")
-    where_clause: Optional[str] = Field(default=None, description="WHERE clause (without WHERE keyword)")
-    limit: Optional[int] = Field(default=None, description="Limit number of results")
-
-
-class InsertQueryTemplate(BaseModel):
-    """Template for INSERT queries"""
-    table_name: str = Field(description="Table name to insert into")
-    columns: str = Field(description="Column names (comma-separated)")
-    values: str = Field(description="Values to insert (comma-separated, use :param_name for parameters)")
 
 
 # Create MCP server instance
@@ -53,27 +31,66 @@ mcp, app = create_dynamic_mcp(
     logo_file_path=os.path.join(os.path.dirname(__file__), "logo.png"),
 )
 
+# Register UI schema for form rendering
+ui_schema = {
+    "db_type": {"ui:help": "Select the database type you want to connect to"},
+    "host": {
+        "ui:widget": "text",
+        "ui:placeholder": "localhost or db.example.com",
+        "ui:help": "Database server hostname or IP address",
+    },
+    "port": {
+        "ui:widget": "updown",
+        "ui:help": "Database port (leave blank for default)",
+    },
+    "database": {
+        "ui:placeholder": "my_database",
+        "ui:help": "Name of the database to connect to",
+    },
+    "username": {
+        "ui:widget": "text",
+        "ui:placeholder": "db_user",
+        "ui:help": "Database username for authentication",
+    },
+    "password": {
+        "ui:widget": "password",
+        "ui:help": "Database password (will be stored securely)",
+    },
+    "pool_size": {
+        "ui:widget": "updown",
+        "ui:help": "Number of persistent connections to maintain",
+    },
+    "max_overflow": {
+        "ui:widget": "updown",
+        "ui:help": "Maximum additional connections beyond pool_size",
+    },
+    "additional_params": {
+        "ui:widget": "textarea",
+        "ui:options": {"rows": 4},
+        "ui:placeholder": '{"driver": "psycopg2", "ssl": true}',
+        "ui:help": "Additional parameters as JSON object (optional)",
+    },
+}
+mcp.register_ui_schema(ui_schema)
+
 dbs = {}
 
 
 @mcp.on_server_create()
-async def on_server_start(config: TenantSqlDbConfig):
+async def on_server_start(server_id: str, server_config: TenantSqlDbConfig):
     """
     Initialize database connection when MCP server starts.
     This is called once when a server is created with specific configuration.
     """
-    server_id = get_current_server_id()
-    server_config: TenantSqlDbConfig = get_current_server_config(
-        app, server_id)
-    
     try:
         logger.info(
-            f"Initializing database connection for {server_config.db_type}")
-        
+            f"Initializing database connection for {server_config.db_type}"
+        )
+
         db_manager = DatabaseConnectionManager(
-            db_type=config.db_type,
-            host=config.host,
-            port=config.port,
+            db_type=server_config.db_type,
+            host=server_config.host,
+            port=server_config.port,
             database=server_config.database,
             username=server_config.username,
             password=server_config.password,
@@ -81,13 +98,15 @@ async def on_server_start(config: TenantSqlDbConfig):
             pool_size=server_config.pool_size,
             max_overflow=server_config.max_overflow,
         )
-        
+
         # Establish connection
         db_manager.connect()
         dbs[server_id] = db_manager
-        
-        logger.info(f"Database connection established successfully for {config.db_type}")
-        
+        logger.info(
+            f"Database connection established successfully "
+            f"for {server_config.db_type}"
+        )
+
     except Exception as e:
         logger.error(f"Failed to initialize database connection: {str(e)}")
         raise
@@ -100,7 +119,7 @@ async def on_server_stop():
     """
     server_id = get_current_server_id()
     db_manager = dbs[server_id]
-    
+
     try:
         logger.info("Closing database connection")
         db_manager.disconnect()
@@ -109,36 +128,177 @@ async def on_server_stop():
         logger.error(f"Error during database disconnect: {str(e)}")
 
 
-# ============================================================================
-# MCP Tools
-# ============================================================================
-
 @mcp.tool()
-def list_tables() -> str:
+def list_tables() -> list[str]:
     """
     List all tables in the database.
     """
     server_id = get_current_server_id()
+    logger.info(f"Listing tables for server {server_id}")
     db_manager: DatabaseConnectionManager = dbs[server_id]
     return db_manager.get_tables()
 
 
 @mcp.tool()
-def get_table_schema(table_name: str) -> str:
+def get_table_schema(table_name: str) -> Dict[str, Any]:
     """
     Get schema information for a specific table.
-    
+
     Args:
         table_name: Name of the table to inspect
-    
+
     Returns:
         JSON string with table schema information
     """
     server_id = get_current_server_id()
     db_manager: DatabaseConnectionManager = dbs[server_id]
-    return json.dumps(db_manager.get_table_schema(table_name))
+    _schema = db_manager.get_table_schema(table_name)
+    return _schema
+
+
+@mcp.tool()
+def execute_query(
+    query: str, params: Dict[str, Any] | None = None
+) -> list:
+    """
+    Execute a SQL query with optional parameters.
+
+    This tool allows you to execute any SQL query
+    (SELECT, INSERT, UPDATE, DELETE, etc.)
+    with support for parameterized queries to prevent SQL injection.
+
+    Args:
+        query: SQL query to execute
+        params: Optional dictionary of parameters for parameterized queries
+
+    Returns:
+        For SELECT queries: List of dictionaries representing rows
+        For INSERT/UPDATE/DELETE: List with affected_rows count
+    """
+    server_id = get_current_server_id()
+    db_manager: DatabaseConnectionManager = dbs[server_id]
+    # Validate using ExecuteQueryParams for type safety
+    validated = ExecuteQueryParams(query=query, params=params)
+    return db_manager.execute_query(validated.query, validated.params)
+
+
+@mcp.tool()
+def test_connection() -> Dict[str, Any]:
+    """
+    Test the database connection and return connection status information.
+
+    This tool verifies that the database connection is active and returns
+    connection details including database type, version, and pool
+    configuration.
+
+    Returns:
+        Dictionary with connection status, database information, and pool
+        settings
+    """
+    server_id = get_current_server_id()
+    db_manager: DatabaseConnectionManager = dbs[server_id]
+    return db_manager.test_connection()
+
+
+@mcp.template(name="select_query", params_model=SelectQueryTemplate)
+def select_query(params: SelectQueryTemplate, **kwargs) -> str:
+    """
+    Execute a SELECT query with optional limit.
+
+    This template executes a SELECT query and limits the results.
+    The query can include placeholders that will be replaced with kwargs.
+
+    Args:
+        params: SelectQueryTemplate containing:
+            - sql_query: SQL SELECT query to execute (can include format
+              placeholders)
+            - limit: Maximum number of rows to return (default: 2)
+        **kwargs: Additional parameters to format into the query
+
+    Returns:
+        JSON string representation of query results
+    """
+    server_id = get_current_server_id()
+    db_manager: DatabaseConnectionManager = dbs[server_id]
+
+    # Format query with kwargs if provided
+    formatted_query = (
+        params.sql_query.format(**kwargs) if kwargs else params.sql_query
+    )
+
+    # Add LIMIT clause if not already present and limit is specified
+    query_upper = formatted_query.upper().strip()
+    if params.limit > 0 and "LIMIT" not in query_upper:
+        # Check if query ends with semicolon
+        if formatted_query.rstrip().endswith(";"):
+            formatted_query = (
+                formatted_query.rstrip()[:-1] +
+                f" LIMIT {params.limit};"
+            )
+        else:
+            formatted_query = (
+                formatted_query.rstrip() + f" LIMIT {params.limit}"
+            )
+
+    results = db_manager.execute_query(formatted_query)
+    return str(results)
+
+
+@mcp.template(name="insert_query", params_model=InsertQueryTemplate)
+def insert_query(params: InsertQueryTemplate, **kwargs) -> str:
+    """
+    Generate and execute an INSERT query.
+
+    This template generates an INSERT INTO statement and executes it.
+    Supports parameterized values using :param_name syntax.
+
+    Args:
+        params: InsertQueryTemplate containing:
+            - table_name: Name of the table to insert into
+            - columns: Comma-separated column names
+            - values: Comma-separated values (can include :param_name
+              placeholders)
+        **kwargs: Additional parameters to substitute into the query
+
+    Returns:
+        JSON string representation of insertion result (affected_rows)
+    """
+    server_id = get_current_server_id()
+    db_manager: DatabaseConnectionManager = dbs[server_id]
+
+    # Build INSERT query
+    values_list = [val.strip() for val in params.values.split(",")]
+
+    # Build VALUES clause with placeholders
+    values_placeholders = ", ".join(values_list)
+
+    # Format the query with kwargs if provided
+    formatted_values = (
+        values_placeholders.format(**kwargs) if kwargs else values_placeholders
+    )
+
+    query = (
+        f"INSERT INTO {params.table_name} ({params.columns}) "
+        f"VALUES ({formatted_values})"
+    )
+
+    # Extract parameters from kwargs that match :param_name pattern
+    param_pattern = r":(\w+)"
+    param_names = re.findall(param_pattern, formatted_values)
+    query_params = {
+        name: kwargs.get(name)
+        for name in param_names
+        if name in kwargs
+    }
+
+    # Execute query with parameters
+    results = db_manager.execute_query(
+        query, query_params if query_params else None
+    )
+    return str(results)
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8026, reload=True)
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8026, reload=True, workers=3)

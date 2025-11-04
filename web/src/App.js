@@ -14,12 +14,10 @@ const ProtectedRoute = ({ children }) => {
   const location = useLocation();
 
   React.useEffect(() => {
-    console.log('ProtectedRoute check:', { isAuthenticated, isLoading, path: location.pathname });
     
     // Only redirect if we KNOW the user is not authenticated (false, not null)
     // Don't redirect during loading (null)
     if (isAuthenticated === false && !isLoading) {
-      console.log('❌ User not authenticated - redirecting to login');
       navigate('/auth/login', { state: { from: location }, replace: true });
     }
   }, [isAuthenticated, isLoading, navigate, location]);

@@ -11,7 +11,7 @@ export const useMCPClient = (serverUrl, transportType = 'auto', authToken = null
     return serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
   }, [serverUrl]);
   
-  const debug = true; // Enable debug logging
+  const debug = false; // Enable debug logging
   
   // Create mcpOptions with proper dependency tracking
   const mcpOptions = React.useMemo(() => {
@@ -52,7 +52,6 @@ export const useMCPClient = (serverUrl, transportType = 'auto', authToken = null
       };
     }
 
-    console.log('options######## ', options);
     return options;
   }, [normalizedUrl, transportType, authToken, debug]);
 

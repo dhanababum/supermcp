@@ -8,10 +8,7 @@ This file demonstrates how to:
 """
 
 # Example 1: SQLite Configuration
-sqlite_config = {
-    "db_type": "sqlite",
-    "database": "test.db"
-}
+sqlite_config = {"db_type": "sqlite", "database": "test.db"}
 
 # Example 2: PostgreSQL Configuration
 postgresql_config = {
@@ -22,7 +19,7 @@ postgresql_config = {
     "username": "postgres",
     "password": "secret123",
     "pool_size": 5,
-    "max_overflow": 10
+    "max_overflow": 10,
 }
 
 # Example 3: MySQL Configuration
@@ -33,9 +30,7 @@ mysql_config = {
     "database": "myapp_db",
     "username": "root",
     "password": "secret123",
-    "additional_params": {
-        "driver": "pymysql"
-    }
+    "additional_params": {"driver": "pymysql"},
 }
 
 # Example 4: Snowflake Configuration
@@ -47,8 +42,8 @@ snowflake_config = {
     "additional_params": {
         "account": "mycompany.us-east-1",
         "warehouse": "ANALYTICS_WH",
-        "schema": "PUBLIC"
-    }
+        "schema": "PUBLIC",
+    },
 }
 
 # Example Tool Usage (after server is created)
@@ -105,4 +100,3 @@ execute_query_template(
 )
 # Output: "UPDATE users SET status = :status WHERE id = :id"
 """
-

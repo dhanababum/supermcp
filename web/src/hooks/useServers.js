@@ -10,7 +10,6 @@ export const useServers = (shouldFetch = true) => {
   const fetchServers = useCallback(async () => {
     // Prevent duplicate fetches
     if (isFetchingRef.current) {
-      console.log('⚠️ Servers fetch already in progress, skipping...');
       return;
     }
 
@@ -19,12 +18,9 @@ export const useServers = (shouldFetch = true) => {
     setError(null);
     
     try {
-      console.log('📡 Fetching servers...');
       const data = await api.getServers();
       setServers(data);
-      console.log('✅ Servers loaded:', data.length);
     } catch (err) {
-      console.error('❌ Error fetching servers:', err);
       setError(err.message);
     } finally {
       setLoading(false);

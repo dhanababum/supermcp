@@ -28,9 +28,10 @@ async def verify_token(
 ):
     token = request.headers.get("Authorization").replace("Bearer ", "")
     async with httpx.AsyncClient(timeout=20) as client:
+        print(f"Verifying token {settings.app_base_url}/api/quick-token-verify, Bearer {token}.................")
         response = await client.get(
             settings.app_base_url + "/api/quick-token-verify",
             headers={"Authorization": f"Bearer {token}"})
         if response.status_code != 200:
             raise HTTPException(status_code=401, detail="Invalid token")
-        return await response.json()
+        return response.json()

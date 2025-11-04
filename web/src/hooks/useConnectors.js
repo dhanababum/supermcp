@@ -10,7 +10,6 @@ export const useConnectors = (shouldFetch = true) => {
   const fetchConnectors = useCallback(async () => {
     // Prevent duplicate fetches
     if (isFetchingRef.current) {
-      console.log('⚠️ Connectors fetch already in progress, skipping...');
       return;
     }
 
@@ -19,7 +18,6 @@ export const useConnectors = (shouldFetch = true) => {
     setError(null);
     
     try {
-      console.log('📡 Fetching connectors...');
       const data = await api.getConnectors();
       // Transform the data to match frontend expectations
       const connectorsList = data.map(connector => ({
@@ -34,9 +32,7 @@ export const useConnectors = (shouldFetch = true) => {
         updated_at: connector.updated_at
       }));
       setConnectors(connectorsList);
-      console.log('✅ Connectors loaded:', connectorsList.length);
     } catch (err) {
-      console.error('❌ Error fetching connectors:', err);
       setError(err.message);
     } finally {
       setLoading(false);

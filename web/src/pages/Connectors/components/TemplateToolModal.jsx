@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
+import Notification from '../../components/common/Notification';
 
 const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [step, setStep] = useState(1); // 1: Select template, 2: Fill form, 3: Review
+  const [notification, setNotification] = useState(null);
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -19,7 +20,10 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
       setTemplates(data.templates || []);
     } catch (error) {
       console.error('Error fetching templates:', error);
-      setError('Failed to load templates');
+      setNotification({
+        type: 'error',
+        message: 'Failed to load templates. Please try again.'
+      });
     } finally {
       setLoading(false);
     }
@@ -59,7 +63,6 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
   const handleSubmit = async () => {
     try {
       setLoading(true);
-      setError(null);
 
       // Create the tool based on template and form data
       const toolData = {
@@ -84,17 +87,32 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
         throw new Error(errorData.detail || 'Failed to create tool');
       }
 
-      const result = await response.json();
-      console.log('Tool created:', result);
+      await response.json();
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: `Tool "${selectedTemplate.name}" created successfully!`
+      });
       
       if (onSuccess) {
         onSuccess();
       }
-      onClose();
+      
+      // Close modal after a short delay
+      setTimeout(() => {
+        onClose();
+      }, 500);
       
     } catch (error) {
       console.error('Error creating tool:', error);
-      setError('Failed to create tool: ' + error.message);
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: error.message || 'Failed to create tool. Please try again.'
+      });
+      
     } finally {
       setLoading(false);
     }
@@ -105,8 +123,8 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
       setTemplates([]);
       setSelectedTemplate(null);
       setFormData({});
-      setError(null);
       setStep(1);
+      setNotification(null);
       onClose();
     }
   };
@@ -114,8 +132,19 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <>
+      {/* Notification Toast */}
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={4000}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
         <div 
           className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
@@ -205,20 +234,6 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
                 <div className="text-center">
                   <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
                   <p className="mt-4 text-gray-600">Loading templates...</p>
-                </div>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex">
-                    <svg className="w-5 h-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">Error</h3>
-                      <p className="text-sm text-red-700 mt-1">{error}</p>
-                    </div>
-                  </div>
                 </div>
               </div>
             ) : step === 1 ? (
@@ -388,6 +403,7 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

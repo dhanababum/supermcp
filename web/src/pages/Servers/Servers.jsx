@@ -1,44 +1,86 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useServers } from '../../hooks';
-import { LoadingSpinner, ErrorMessage } from '../../components/common';
+import { LoadingSpinner, ErrorMessage, Notification } from '../../components/common';
 import { ServerTable } from './components';
 import { api } from '../../services/api';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 const Servers = ({ onNavigate, onSelectServer }) => {
   const { servers, loading, error, refetch } = useServers(true);
+  const [notification, setNotification] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [serverToDelete, setServerToDelete] = useState(null);
 
   const handleViewServer = (server) => {
     onSelectServer(server);
     onNavigate('server-tools');
   };
 
-  const handleDeleteServer = async (server) => {
-    const confirmMessage = `⚠️ Are you sure you want to delete server "${server.server_name}"?\n\nThis will permanently delete:\n• The server configuration\n• All associated tokens\n• All associated tools\n\nThis action cannot be undone.`;
-    
-    if (window.confirm(confirmMessage)) {
-      try {
-        const data = await api.deleteServer(server.id);
-        const message = [
-          `✅ ${data.message}`,
-          ``,
-          `Deleted tokens: ${data.deleted_tokens}`,
-          `Deleted tools: ${data.deleted_tools}`
-        ].join('\n');
-        alert(message);
-        refetch();
-      } catch (err) {
-        console.error('Error deleting server:', err);
-        alert(`❌ Failed to delete server: ${err.message}`);
-      }
+  const handleDeleteServer = (server) => {
+    setServerToDelete(server);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!serverToDelete) return;
+
+    setShowDeleteModal(false);
+
+    try {
+      const data = await api.deleteServer(serverToDelete.id);
+      
+      setNotification({
+        type: 'success',
+        message: `${data.message} • Deleted tokens: ${data.deleted_tokens} • Deleted tools: ${data.deleted_tools}`
+      });
+      
+      refetch();
+    } catch (err) {
+      console.error('Error deleting server:', err);
+      
+      setNotification({
+        type: 'error',
+        message: `Failed to delete server: ${err.message}`
+      });
+    } finally {
+      setServerToDelete(null);
     }
   };
 
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    setServerToDelete(null);
+  };
+
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">MCP Servers</h1>
-        <p className="text-gray-600">Manage your configured MCP server instances</p>
-      </div>
+    <>
+      {/* Notification Toast */}
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={5000}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Delete Server"
+        message={serverToDelete ? `Are you sure you want to delete server "${serverToDelete.server_name}"? This will permanently delete the server configuration, all associated tokens, and all associated tools. This action cannot be undone.` : ''}
+        confirmText="Delete Server"
+        cancelText="Cancel"
+        isDestructive={true}
+      />
+
+      <div>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">MCP Servers</h1>
+          <p className="text-gray-600">Manage your configured MCP server instances</p>
+        </div>
 
       {loading ? (
         <LoadingSpinner message="Loading servers..." />
@@ -84,7 +126,8 @@ const Servers = ({ onNavigate, onSelectServer }) => {
           />
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

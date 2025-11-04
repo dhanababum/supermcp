@@ -41,6 +41,7 @@ class DynamicMCP(FastMCP, TemplateMixin):
     
     _connector_config: Type[BaseModel] | None = None
     _logo_file_path: str | None = None
+    _ui_schema: Optional[dict] = None
     _server_create_hooks: List[Callable] = []
     _server_destroy_hooks: List[Callable] = []
 
@@ -60,6 +61,10 @@ class DynamicMCP(FastMCP, TemplateMixin):
     def register_logo_file_path(self, logo_file_path: str):
         """Register the path to the connector logo"""
         self._logo_file_path = logo_file_path
+    
+    def register_ui_schema(self, ui_schema: dict):
+        """Register the UI schema for form rendering hints"""
+        self._ui_schema = ui_schema
     
     def on_server_create(self, func: Optional[Callable] = None):
         """
@@ -98,7 +103,7 @@ class DynamicMCP(FastMCP, TemplateMixin):
         else:
             return decorator(func)
 
-    async def _execute_create_hooks(self, server_id: str, server_data: dict):
+    async def _execute_create_hooks(self, server_id: str, server_data: BaseModel):
         """Execute all registered server create hooks"""
         for hook in self._server_create_hooks:
             try:
@@ -133,7 +138,8 @@ async def create_mcp_servers_dictionary(
         online_servers = response.json()
         for key, server in online_servers.items():
             app.state.mcp_servers[key] = mcp._connector_config(**server)
-            await mcp._execute_create_hooks(key, server)
+            await mcp._execute_create_hooks(
+                server_id=key, server_data=mcp._connector_config(**server))
             app.mount(f"/mcp/{key}", app=mcp_app, name=key)
             print(f"MCP app mounted for server {key}")
     return app.state.mcp_servers
@@ -206,6 +212,7 @@ def create_dynamic_mcp(
         ]
         config = ConnectorConfig(
             params=mcp._connector_config.model_json_schema(),
+            ui_schema=mcp._ui_schema
         )
         data = ConnectorTemplate(
             name=mcp.name,
@@ -226,6 +233,7 @@ def create_dynamic_mcp(
         """Endpoint to dynamically create and mount a new server."""
         server_id = request.path_params["server_id"]
         await verify_token(request)
+        print(f"Creating new server {server_id}")
         if server_id in app.state.mcp_servers:
             return JSONResponse({"message": f"Server {server_id} already exists."})
         
@@ -236,9 +244,11 @@ def create_dynamic_mcp(
                 headers={"Authorization": f"Bearer {settings.connector_secret}"}
             )
             server_data = response.json()
-            app.state.mcp_servers[server_id] = server_data
+            app.state.mcp_servers[server_id] = mcp._connector_config(
+                **server_data)
         
-        await mcp._execute_create_hooks(server_id, server_data)
+        await mcp._execute_create_hooks(
+            server_id, app.state.mcp_servers[server_id])
         
         # Mount the MCP app, not the wrapper app!
         app.mount(f"/mcp/{server_id}", mcp_app, name=server_id)  # ← Changed: mount mcp_app

@@ -284,7 +284,7 @@ def register_connector(req: RegisterRequest, session: AsyncSession = Depends(get
         name=req.name,
         secret=secret_hash,
         mode=ConnectorMode.sync.value,  # Convert enum to string value
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.utcnow(),
     )
     session.add(connector)
     session.commit()
@@ -353,7 +353,10 @@ async def get_servers(
     Get all active servers based on connector id.
     """
     result = await session.execute(
-        select(McpServer).where(McpServer.connector_id == connector.id)
+        select(McpServer).where(
+            McpServer.connector_id == connector.id,
+            McpServer.is_active.is_(True)
+        )
     )
     servers = result.scalars().all()
     return {
@@ -596,7 +599,7 @@ async def update_connector_mode(
 
         # Update the mode
         connector.mode = new_mode
-        connector.updated_at = datetime.now(timezone.utc)
+        connector.updated_at = datetime.utcnow()
 
         session.add(connector)
         await session.commit()
@@ -833,7 +836,7 @@ async def revoke_connector_access(
 
     # Mark as inactive
     access.is_active = False
-    access.updated_at = datetime.now(timezone.utc)
+    access.updated_at = datetime.utcnow()
     session.add(access)
     await session.commit()
 
@@ -1038,10 +1041,10 @@ async def create_server(
 
     token_data = await get_token(mcp_server.id)
 
-    with httpx.Client(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         print(mcp_server.server_url)
         print(token_data['access_token'])
-        response = client.post(
+        response = await client.post(
             f"{mcp_server.server_url}/create-server/{mcp_server.id}",
             headers={"Authorization": f"Bearer {token_data['access_token']}"},
         )
@@ -1074,7 +1077,6 @@ async def list_all_servers(
             McpServer.user_id == current_user.id)
         .order_by(McpServer.updated_at.desc())
     )
-
     result = await session.execute(statement)
     configs = result.scalars().all()
 
@@ -1476,7 +1478,7 @@ async def update_tool_status(
 
 @router.delete("/servers/{server_id}/tools/{tool_id}")
 async def delete_tool(
-    server_id: int, tool_id: int, session: AsyncSession = Depends(get_async_session)
+    server_id: str, tool_id: int, session: AsyncSession = Depends(get_async_session)
 ) -> dict:
     """
     Permanently delete a tool from a server.
@@ -1486,9 +1488,12 @@ async def delete_tool(
     try:
         # Get the tool
         tool_statement = select(McpServerTool).where(
-            McpServerTool.id == tool_id, McpServerTool.mcp_server_id == server_id
+            McpServerTool.id == tool_id,
+            McpServerTool.mcp_server_id == server_id
         )
-        tool: McpServerTool = await session.execute(tool_statement).first()
+        tool: McpServerTool = await session.execute(
+            tool_statement)
+        tool: McpServerTool = tool.scalars().first()
         if not tool:
             raise HTTPException(
                 status_code=404, detail=f"No tool found with id: {tool_id}"

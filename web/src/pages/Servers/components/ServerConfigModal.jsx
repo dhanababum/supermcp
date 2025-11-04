@@ -14,7 +14,6 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
     try {
       // Fetch server tokens to get the bearer token
       const tokens = await api.getServerTokens(server.id);
-      console.log('server......', server);
       if (tokens && tokens.length > 0) {
         const token = tokens[0]; // Use the first token
         // Generate the server URL with server ID
