@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar, Banner } from './components/layout';
 import { ErrorBoundary } from './components/common';
-import { Dashboard, Connectors, Servers, ServerTools, MCPClient } from './pages';
+import { Dashboard, Connectors, Servers, ServerTools, ServerTokens, MCPClient } from './pages';
 import { Auth } from './pages/Auth';
 import OAuthCallback from './pages/OAuthCallback';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -70,6 +70,7 @@ const AppLayout = ({ children }) => {
 const ServerToolsPage = () => {
   const [selectedServer, setSelectedServer] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSelectServer = (server) => {
     setSelectedServer(server);
@@ -80,11 +81,23 @@ const ServerToolsPage = () => {
     navigate('/servers');
   };
 
+  // Check if we're on tokens page
+  const isTokensPage = location.pathname.includes('/server-tokens');
+
   if (!selectedServer) {
     return (
       <Servers
         onNavigate={(route) => navigate(`/${route}`)}
         onSelectServer={handleSelectServer}
+      />
+    );
+  }
+
+  if (isTokensPage) {
+    return (
+      <ServerTokens
+        server={selectedServer}
+        onBack={handleBackToServers}
       />
     );
   }
@@ -144,6 +157,14 @@ function App() {
         } />
         
         <Route path="/server-tools" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ServerToolsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/server-tokens" element={
           <ProtectedRoute>
             <AppLayout>
               <ServerToolsPage />

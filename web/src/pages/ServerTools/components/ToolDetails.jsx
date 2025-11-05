@@ -18,10 +18,6 @@ const ToolDetails = ({ tool }) => {
     }
   }, [tool]);
 
-  const handleExecute = () => {
-    console.log('Tool Inputs:', toolInputs);
-    alert('Tool execution not yet implemented\n\nInputs: ' + JSON.stringify(toolInputs, null, 2));
-  };
 
   if (!tool) {
     return (
@@ -157,16 +153,6 @@ const ToolDetails = ({ tool }) => {
                   </div>
                 </div>
               ))}
-
-              {/* Execute Button */}
-              <div className="pt-4 border-t border-gray-200">
-                <button
-                  onClick={handleExecute}
-                  className="w-full px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
-                >
-                  Execute Tool
-                </button>
-              </div>
             </div>
           ) : (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">

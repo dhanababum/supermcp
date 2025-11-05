@@ -1142,7 +1142,7 @@ async def get_servers_with_tokens(session: AsyncSession = Depends(get_async_sess
 
 @router.get("/servers/{server_id}")
 async def get_server(
-    server_id: int, session: AsyncSession = Depends(get_async_session)
+    server_id: str, session: AsyncSession = Depends(get_async_session)
 ) -> dict:
     """
     Retrieve the active configuration for a specific server.
@@ -1292,9 +1292,9 @@ async def get_server_tokens(
             status_code=404, detail=f"No server found with id: {server_id}"
         )
 
-    # Get active tokens for this server
+    # Get all tokens for this server (active and inactive for management)
     token_statement = select(McpServerToken).where(
-        McpServerToken.mcp_server_id == server_id, McpServerToken.is_active.is_(True)
+        McpServerToken.mcp_server_id == server_id
     )
     tokens = await session.execute(token_statement)
     tokens = tokens.scalars().all()
@@ -1309,6 +1309,211 @@ async def get_server_tokens(
         }
         for token in tokens
     ]
+
+
+@router.post("/servers/{server_id}/tokens")
+async def create_server_token(
+    server_id: str,
+    token_data: dict = None,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> dict:
+    """
+    Create a new token for a specific server.
+    """
+    try:
+        # Check if server exists and user has access
+        server_statement = select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.is_active.is_(True),
+            McpServer.user_id == current_user.id,
+        )
+        server = await session.execute(server_statement)
+        server: McpServer = server.scalars().first()
+
+        if not server:
+            raise HTTPException(
+                status_code=404, detail=f"No server found with id: {server_id}"
+            )
+
+        # Extract token_expires_at if provided
+        token_expires_at = None
+        if token_data and "expires_at" in token_data:
+            token_expires_at_str = token_data.get("expires_at")
+            if token_expires_at_str:
+                try:
+                    from dateutil import parser
+                    token_expires_at = parser.parse(token_expires_at_str)
+                except Exception:
+                    raise HTTPException(
+                        status_code=400, detail="Invalid expires_at format"
+                    )
+
+        # Generate a secure token
+        token_value = f"mcp_token_{secrets.token_urlsafe(32)}"
+        token = McpServerToken(
+            token=token_value,
+            mcp_server_id=server.id,
+            user_id=current_user.id,
+            expires_at=token_expires_at,
+        )
+        session.add(token)
+        await session.commit()
+        await session.refresh(token)
+
+        return {
+            "status": "created",
+            "message": f"Token created successfully for server '{server.server_name}'",
+            "token_id": token.id,
+            "token": token_value,
+            "expires_at": token.expires_at.isoformat() if token.expires_at else None,
+            "is_active": token.is_active,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create token: {str(e)}"
+        )
+
+
+@router.delete("/servers/{server_id}/tokens/{token_id}")
+async def delete_server_token(
+    server_id: str,
+    token_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> dict:
+    """
+    Delete a token for a specific server.
+    """
+    try:
+        # Check if server exists and user has access
+        server_statement = select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.is_active.is_(True),
+            McpServer.user_id == current_user.id,
+        )
+        server = await session.execute(server_statement)
+        server: McpServer = server.scalars().first()
+
+        if not server:
+            raise HTTPException(
+                status_code=404, detail=f"No server found with id: {server_id}"
+            )
+
+        # Get the token
+        token_statement = select(McpServerToken).where(
+            McpServerToken.id == token_id,
+            McpServerToken.mcp_server_id == server_id,
+        )
+        token = await session.execute(token_statement)
+        token: McpServerToken = token.scalars().first()
+
+        if not token:
+            raise HTTPException(
+                status_code=404, detail=f"No token found with id: {token_id}"
+            )
+
+        # Soft delete: mark as inactive
+        token.is_active = False
+        token.updated_at = datetime.utcnow()
+        session.add(token)
+        await session.commit()
+
+        return {
+            "status": "deleted",
+            "message": "Token deleted successfully",
+            "token_id": token_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete token: {str(e)}"
+        )
+
+
+@router.patch("/servers/{server_id}/tokens/{token_id}")
+async def update_server_token(
+    server_id: str,
+    token_id: int,
+    update_data: dict,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> dict:
+    """
+    Update a token (enable/disable or update expires_at).
+    """
+    try:
+        # Check if server exists and user has access
+        server_statement = select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.is_active.is_(True),
+            McpServer.user_id == current_user.id,
+        )
+        server = await session.execute(server_statement)
+        server: McpServer = server.scalars().first()
+
+        if not server:
+            raise HTTPException(
+                status_code=404, detail=f"No server found with id: {server_id}"
+            )
+
+        # Get the token
+        token_statement = select(McpServerToken).where(
+            McpServerToken.id == token_id,
+            McpServerToken.mcp_server_id == server_id,
+        )
+        token = await session.execute(token_statement)
+        token: McpServerToken = token.scalars().first()
+
+        if not token:
+            raise HTTPException(
+                status_code=404, detail=f"No token found with id: {token_id}"
+            )
+
+        # Update token fields
+        if "is_active" in update_data:
+            token.is_active = update_data["is_active"]
+
+        if "expires_at" in update_data:
+            expires_at_str = update_data.get("expires_at")
+            if expires_at_str:
+                try:
+                    from dateutil import parser
+                    token.expires_at = parser.parse(expires_at_str)
+                except Exception:
+                    raise HTTPException(
+                        status_code=400, detail="Invalid expires_at format"
+                    )
+            else:
+                token.expires_at = None
+
+        token.updated_at = datetime.utcnow()
+        session.add(token)
+        await session.commit()
+        await session.refresh(token)
+
+        return {
+            "status": "updated",
+            "message": "Token updated successfully",
+            "token_id": token.id,
+            "is_active": token.is_active,
+            "expires_at": token.expires_at.isoformat() if token.expires_at else None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update token: {str(e)}"
+        )
 
 
 @router.get("/servers/{server_id}/tools/database")
@@ -1390,7 +1595,8 @@ async def get_server_tools(
         )
 
     # Get all tools from database (both active and inactive for management)
-    server_tools: List[McpServerTool] = await session.execute(select(McpServerTool).where(McpServerTool.mcp_server_id == server_id))
+    server_tools: List[McpServerTool] = await session.execute(
+        select(McpServerTool).where(McpServerTool.mcp_server_id == server_id))
     server_tools = server_tools.scalars().all()
 
     if not server_tools:
@@ -1445,8 +1651,8 @@ async def update_tool_status(
         tool_statement = select(McpServerTool).where(
             McpServerTool.id == tool_id, McpServerTool.mcp_server_id == server_id
         )
-        tool = await session.execute(tool_statement).first()
-
+        tool = await session.execute(tool_statement)
+        tool = tool.scalars().first()
         if not tool:
             raise HTTPException(
                 status_code=404,
@@ -1457,9 +1663,9 @@ async def update_tool_status(
         if "is_active" in update_data:
             tool.is_active = update_data["is_active"]
             tool.updated_at = datetime.utcnow()
-            await session.add(tool)
+            session.add(tool)
             await session.commit()
-            session.refresh(tool)
+            await session.refresh(tool)
 
         return {
             "status": "updated",
@@ -1510,7 +1716,7 @@ async def delete_tool(
         tool_name = tool.name
         tool_type = tool.tool_type.value
         await session.delete(tool)
-        session.commit()
+        await session.commit()
 
         return {
             "status": "deleted",

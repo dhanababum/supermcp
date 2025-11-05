@@ -570,10 +570,13 @@ class DatabaseConnectionManager:
 
                     # If it's a SELECT query, fetch results
                     if result.returns_rows:
+                        # Convert result to list of dictionaries
+                        # Using all() which works with async results
+                        rows_data = result.all()
                         columns = result.keys()
                         rows = [
                             dict(zip(columns, row))
-                            for row in await result.fetchall()
+                            for row in rows_data
                         ]
                         return rows
                     else:

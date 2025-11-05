@@ -29,11 +29,20 @@ class CustomToolMiddleware(Middleware):
             access_token.token, context.message.name)
         fastmcp_context = context.fastmcp_context.fastmcp
         if app_server_tool and app_server_tool.tool_type == ToolType.dynamic:
-            result = fastmcp_context.render_template(
-                name=app_server_tool.template_name,
-                raw_params=app_server_tool.template_args,
-                extra_kwargs=context.message.arguments
-            )
+            is_async = fastmcp_context.get_template(
+                app_server_tool.template_name).is_async
+            if is_async:
+                result = await fastmcp_context.render_template_async(
+                    name=app_server_tool.template_name,
+                    raw_params=app_server_tool.template_args,
+                    extra_kwargs=context.message.arguments
+                )
+            else:
+                result = fastmcp_context.render_template(
+                    name=app_server_tool.template_name,
+                    raw_params=app_server_tool.template_args,
+                    extra_kwargs=context.message.arguments
+                )
             result = ToolResult(
                 content=[
                     TextContent(

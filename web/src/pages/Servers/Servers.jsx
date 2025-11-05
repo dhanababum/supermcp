@@ -16,6 +16,11 @@ const Servers = ({ onNavigate, onSelectServer }) => {
     onNavigate('server-tools');
   };
 
+  const handleViewTokens = (server) => {
+    onSelectServer(server);
+    onNavigate('server-tokens');
+  };
+
   const handleDeleteServer = (server) => {
     setServerToDelete(server);
     setShowDeleteModal(true);
@@ -123,6 +128,8 @@ const Servers = ({ onNavigate, onSelectServer }) => {
             servers={servers}
             onView={handleViewServer}
             onDelete={handleDeleteServer}
+            onRefresh={refetch}
+            onViewTokens={handleViewTokens}
           />
         </div>
       )}

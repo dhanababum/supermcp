@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { ServerConfigModal } from './index';
+import { ServerConfigModal, ServerEditModal } from './index';
 
-const ServerTable = ({ servers, onView, onDelete }) => {
+const ServerTable = ({ servers, onView, onDelete, onRefresh, onViewTokens }) => {
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedServer, setSelectedServer] = useState(null);
+  const [serverToEdit, setServerToEdit] = useState(null);
 
   const handleViewConfig = (server) => {
     setSelectedServer(server);
@@ -13,6 +15,22 @@ const ServerTable = ({ servers, onView, onDelete }) => {
   const handleCloseConfig = () => {
     setConfigModalOpen(false);
     setSelectedServer(null);
+  };
+
+  const handleEditServer = (server) => {
+    setServerToEdit(server);
+    setEditModalOpen(true);
+  };
+
+  const handleCloseEdit = () => {
+    setEditModalOpen(false);
+    setServerToEdit(null);
+  };
+
+  const handleEditSuccess = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
   };
 
   if (servers.length === 0) {
@@ -112,8 +130,17 @@ const ServerTable = ({ servers, onView, onDelete }) => {
                 >
                   Config
                 </button>
-                <button className="text-blue-600 hover:text-blue-900 mr-3">
+                <button 
+                  onClick={() => handleEditServer(server)}
+                  className="text-blue-600 hover:text-blue-900 mr-3"
+                >
                   Edit
+                </button>
+                <button 
+                  onClick={() => onViewTokens && onViewTokens(server)}
+                  className="text-orange-600 hover:text-orange-900 mr-3"
+                >
+                  Tokens
                 </button>
                 <button 
                   onClick={() => onDelete(server)}
@@ -133,6 +160,14 @@ const ServerTable = ({ servers, onView, onDelete }) => {
         server={selectedServer}
         isOpen={configModalOpen}
         onClose={handleCloseConfig}
+      />
+      
+      {/* Server Edit Modal */}
+      <ServerEditModal
+        server={serverToEdit}
+        isOpen={editModalOpen}
+        onClose={handleCloseEdit}
+        onSuccess={handleEditSuccess}
       />
     </div>
   );

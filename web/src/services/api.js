@@ -228,6 +228,17 @@ export const api = {
     });
   },
 
+  getServer: async (serverId) => {
+    return apiRequest(API_ROUTES.server(serverId));
+  },
+
+  updateServer: async (serverId, serverData) => {
+    return apiRequest(API_ROUTES.server(serverId), {
+      method: 'PUT',
+      body: JSON.stringify(serverData),
+    });
+  },
+
   // Server Tools
   getServerTools: async (serverId) => {
     return apiRequest(API_ROUTES.serverTools(serverId));
@@ -243,6 +254,26 @@ export const api = {
   // Server Tokens
   getServerTokens: async (serverId) => {
     return apiRequest(`/api/servers/${serverId}/tokens`);
+  },
+
+  createServerToken: async (serverId, tokenData) => {
+    return apiRequest(`/api/servers/${serverId}/tokens`, {
+      method: 'POST',
+      body: JSON.stringify(tokenData || {}),
+    });
+  },
+
+  deleteServerToken: async (serverId, tokenId) => {
+    return apiRequest(`/api/servers/${serverId}/tokens/${tokenId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  updateServerToken: async (serverId, tokenId, updateData) => {
+    return apiRequest(`/api/servers/${serverId}/tokens/${tokenId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updateData),
+    });
   },
 };
 
