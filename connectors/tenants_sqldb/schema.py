@@ -11,6 +11,8 @@ class DatabaseType(str, Enum):
     MSSQL = "mssql"
     ORACLE = "oracle"
     SNOWFLAKE = "snowflake"
+    DATABRICKS = "databricks"
+    MARIADB = "mariadb"
 
 
 class TenantSqlDbConfig(BaseModel):
@@ -37,6 +39,10 @@ class TenantSqlDbConfig(BaseModel):
     additional_params: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Additional database-specific parameters (e.g., driver, warehouse for Snowflake)",
+    )
+    db_name: Optional[str] = Field(
+        default="default",
+        description="Identifier for this database instance (for multi-db support)"
     )
 
 

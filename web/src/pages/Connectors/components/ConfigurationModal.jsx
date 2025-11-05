@@ -43,6 +43,10 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
           if (extractedSchema && extractedSchema.properties) {
             Object.keys(extractedSchema.properties).forEach(key => {
               const prop = extractedSchema.properties[key];
+              const uiField = extractedUiSchema[key];
+              
+              // Check if this is an object type field with textarea widget BEFORE anyOf processing
+              const isObjectWithTextarea = prop.type === 'object' && uiField && uiField['ui:widget'] === 'textarea';
               
               // If property has anyOf with [type, null], simplify it
               if (prop.anyOf && Array.isArray(prop.anyOf)) {
@@ -59,11 +63,43 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
                   };
                 }
               }
+              
+              // Convert object type to string type if textarea widget is specified
+              // RJSF doesn't render textarea widgets for object types
+              const finalProp = extractedSchema.properties[key];
+              if (isObjectWithTextarea || (finalProp.type === 'object' && uiField && uiField['ui:widget'] === 'textarea')) {
+                // Convert to string type with JSON format
+                extractedSchema.properties[key] = {
+                  ...finalProp,
+                  type: 'string',
+                  format: 'json',
+                  // Convert default object to JSON string if it exists
+                  default: finalProp.default && typeof finalProp.default === 'object' ? JSON.stringify(finalProp.default, null, 2) : finalProp.default
+                };
+              }
             });
           }
           
           setSchema(extractedSchema);
           setUiSchema(extractedUiSchema);
+          
+          // Initialize formData with JSON string conversion for object fields with textarea
+          const initialFormData = {};
+          if (extractedSchema && extractedSchema.properties && extractedUiSchema) {
+            Object.keys(extractedSchema.properties).forEach(key => {
+              const prop = extractedSchema.properties[key];
+              const uiField = extractedUiSchema[key];
+              
+              // If this is an object type field with textarea widget, convert to string
+              if (prop.type === 'string' && prop.format === 'json' && uiField && uiField['ui:widget'] === 'textarea') {
+                // If there's a default value that's an object, convert it to JSON string
+                if (prop.default && typeof prop.default === 'object') {
+                  initialFormData[key] = JSON.stringify(prop.default, null, 2);
+                }
+              }
+            });
+          }
+          setFormData(initialFormData);
         })
         .catch((error) => {
           console.error('Error fetching schema:', error);
@@ -85,10 +121,32 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
       return;
     }
 
+    // Convert JSON string fields back to objects for fields with textarea widget
+    // that were originally object types
+    const processedData = { ...data };
+    if (uiSchema && Object.keys(uiSchema).length > 0) {
+      Object.keys(uiSchema).forEach(key => {
+        const uiField = uiSchema[key];
+        if (uiField && uiField['ui:widget'] === 'textarea' && processedData[key]) {
+          const value = processedData[key];
+          // If it's a string, try to parse it as JSON
+          if (typeof value === 'string' && value.trim()) {
+            try {
+              processedData[key] = JSON.parse(value);
+            } catch (e) {
+              // If parsing fails, keep as string (might be invalid JSON)
+              // The backend validation will handle this
+              console.warn(`Failed to parse JSON for ${key}:`, e);
+            }
+          }
+        }
+      });
+    }
+
     const serverData = {
       connector_id: connector.id,
       server_name: serverName.trim(),
-      configuration: data,
+      configuration: processedData,
       token_expires_at: tokenExpiresAt || null
     };
 

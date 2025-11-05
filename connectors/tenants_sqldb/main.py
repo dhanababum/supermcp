@@ -2,7 +2,8 @@
 
 from mcp_pkg.dynamic_mcp import (
     create_dynamic_mcp,
-    get_current_server_id
+    get_current_server_id,
+    get_current_server_config
 )
 from typing import Dict, Any
 import os
@@ -73,7 +74,9 @@ ui_schema = {
 }
 mcp.register_ui_schema(ui_schema)
 
-dbs = {}
+# Dictionary to store database connections per server
+# Structure: Dict[server_id, DatabaseConnectionManager]
+dbs: Dict[str, DatabaseConnectionManager] = {}
 
 
 @mcp.on_server_create()
@@ -81,6 +84,7 @@ async def on_server_start(server_id: str, server_config: TenantSqlDbConfig):
     """
     Initialize database connection when MCP server starts.
     This is called once when a server is created with specific configuration.
+    Supports multiple database instances per server using db_name identifier.
     """
     try:
         logger.info(
@@ -100,11 +104,17 @@ async def on_server_start(server_id: str, server_config: TenantSqlDbConfig):
         )
 
         # Establish connection
-        db_manager.connect()
+        await db_manager.connect()
+
+  
+
+        # Use db_name from config, default to "default"
+        db_name = server_config.db_name or "default"
         dbs[server_id] = db_manager
+
         logger.info(
             f"Database connection established successfully "
-            f"for {server_config.db_type}"
+            f"for {server_config.db_type} (db_name: {db_name})"
         )
 
     except Exception as e:
@@ -116,48 +126,70 @@ async def on_server_start(server_id: str, server_config: TenantSqlDbConfig):
 async def on_server_stop():
     """
     Cleanup database connection when MCP server stops.
+    Handles multiple database instances per server.
     """
     server_id = get_current_server_id()
-    db_manager = dbs[server_id]
+    if server_id not in dbs:
+        logger.warning(f"No databases found for server {server_id}")
+        return
 
     try:
-        logger.info("Closing database connection")
-        db_manager.disconnect()
+        db_name = get_current_server_config(app, server_id).db_name
+        db_manager = dbs[server_id]
+        logger.info(
+            f"Closing database connection: {db_name} for server {server_id}")
+        await db_manager.disconnect()
+
+        # Remove server entry
         del dbs[server_id]
+        logger.info(f"All database connections closed for server {server_id}")
     except Exception as e:
         logger.error(f"Error during database disconnect: {str(e)}")
 
 
 @mcp.tool()
-def list_tables() -> list[str]:
+async def list_tables() -> list[str]:
     """
     List all tables in the database.
+
+    Args:
+        db_name: Identifier for the database instance (default: "default")
     """
     server_id = get_current_server_id()
-    logger.info(f"Listing tables for server {server_id}")
+    db_name = get_current_server_config(app, server_id).db_name
+    logger.info(f"Listing tables for server {server_id}, db: {db_name}")
+
+    if server_id not in dbs:
+        raise ValueError(f"No databases found for server {server_id}")
+
     db_manager: DatabaseConnectionManager = dbs[server_id]
-    return db_manager.get_tables()
+    return await db_manager.get_tables()
 
 
 @mcp.tool()
-def get_table_schema(table_name: str) -> Dict[str, Any]:
+async def get_table_schema(
+    table_name: str
+) -> Dict[str, Any]:
     """
     Get schema information for a specific table.
 
     Args:
         table_name: Name of the table to inspect
+        db_name: Identifier for the database instance (default: "default")
 
     Returns:
         JSON string with table schema information
     """
     server_id = get_current_server_id()
+    if server_id not in dbs:
+        raise ValueError(f"No databases found for server {server_id}")
     db_manager: DatabaseConnectionManager = dbs[server_id]
-    _schema = db_manager.get_table_schema(table_name)
+    _schema = await db_manager.get_table_schema(table_name)
     return _schema
 
 
 @mcp.tool()
-def execute_query(
+async def execute_query(
     query: str, params: Dict[str, Any] | None = None
 ) -> list:
     """
@@ -170,20 +202,24 @@ def execute_query(
     Args:
         query: SQL query to execute
         params: Optional dictionary of parameters for parameterized queries
+        db_name: Identifier for the database instance (default: "default")
 
     Returns:
         For SELECT queries: List of dictionaries representing rows
         For INSERT/UPDATE/DELETE: List with affected_rows count
     """
     server_id = get_current_server_id()
+    if server_id not in dbs:
+        raise ValueError(f"No databases found for server {server_id}")
+
     db_manager: DatabaseConnectionManager = dbs[server_id]
     # Validate using ExecuteQueryParams for type safety
     validated = ExecuteQueryParams(query=query, params=params)
-    return db_manager.execute_query(validated.query, validated.params)
+    return await db_manager.execute_query(validated.query, validated.params)
 
 
 @mcp.tool()
-def test_connection() -> Dict[str, Any]:
+async def test_connection() -> Dict[str, Any]:
     """
     Test the database connection and return connection status information.
 
@@ -191,17 +227,25 @@ def test_connection() -> Dict[str, Any]:
     connection details including database type, version, and pool
     configuration.
 
+    Args:
+
     Returns:
         Dictionary with connection status, database information, and pool
         settings
     """
     server_id = get_current_server_id()
+    db_name = get_current_server_config(app, server_id).db_name
+    if server_id not in dbs:
+        raise ValueError(f"No databases found for server {server_id}")
     db_manager: DatabaseConnectionManager = dbs[server_id]
-    return db_manager.test_connection()
+    logger.info(f"Testing connection for server {server_id}, db: {db_name}")
+    return await db_manager.test_connection()
 
 
 @mcp.template(name="select_query", params_model=SelectQueryTemplate)
-def select_query(params: SelectQueryTemplate, **kwargs) -> str:
+async def select_query(
+    params: SelectQueryTemplate, **kwargs
+) -> str:
     """
     Execute a SELECT query with optional limit.
 
@@ -219,6 +263,9 @@ def select_query(params: SelectQueryTemplate, **kwargs) -> str:
         JSON string representation of query results
     """
     server_id = get_current_server_id()
+    if server_id not in dbs:
+        raise ValueError(f"No databases found for server {server_id}")
+
     db_manager: DatabaseConnectionManager = dbs[server_id]
 
     # Format query with kwargs if provided
@@ -240,12 +287,14 @@ def select_query(params: SelectQueryTemplate, **kwargs) -> str:
                 formatted_query.rstrip() + f" LIMIT {params.limit}"
             )
 
-    results = db_manager.execute_query(formatted_query)
+    results = await db_manager.execute_query(formatted_query)
     return str(results)
 
 
 @mcp.template(name="insert_query", params_model=InsertQueryTemplate)
-def insert_query(params: InsertQueryTemplate, **kwargs) -> str:
+async def insert_query(
+    params: InsertQueryTemplate, **kwargs
+) -> str:
     """
     Generate and execute an INSERT query.
 
@@ -264,6 +313,9 @@ def insert_query(params: InsertQueryTemplate, **kwargs) -> str:
         JSON string representation of insertion result (affected_rows)
     """
     server_id = get_current_server_id()
+    if server_id not in dbs:
+        raise ValueError(f"No databases found for server {server_id}")
+
     db_manager: DatabaseConnectionManager = dbs[server_id]
 
     # Build INSERT query
@@ -292,7 +344,7 @@ def insert_query(params: InsertQueryTemplate, **kwargs) -> str:
     }
 
     # Execute query with parameters
-    results = db_manager.execute_query(
+    results = await db_manager.execute_query(
         query, query_params if query_params else None
     )
     return str(results)
