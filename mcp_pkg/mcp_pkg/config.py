@@ -7,9 +7,7 @@ class Settings(BaseSettings):
     connector_secret: str
     connector_id: str
     model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        extra="forbid"
+        env_file=".env", case_sensitive=False, extra="forbid"
     )
 
 

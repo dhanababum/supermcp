@@ -1,11 +1,8 @@
 from fastmcp.server.auth import TokenVerifier, AccessToken
 import httpx
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
+from starlette.exceptions import HTTPException
 from .config import settings
-
-token_header = HTTPBearer()
 
 
 class CustomTokenVerifier(TokenVerifier):
@@ -13,25 +10,25 @@ class CustomTokenVerifier(TokenVerifier):
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 settings.app_base_url + "/api/verify-auth-token",
-                headers={"Authorization": f"Bearer {token}"})
+                headers={"Authorization": f"Bearer {token}"},
+            )
             if response.status_code != 200:
                 return None
         return AccessToken(
-            token=token,
-            client_id="dummy",
-            scopes=["read", "write", "admin"]
+            token=token, client_id="dummy", scopes=["read", "write", "admin"]
         )
 
 
-async def verify_token(
-    request: Request
-):
+async def verify_token(request: Request):
     token = request.headers.get("Authorization").replace("Bearer ", "")
     async with httpx.AsyncClient(timeout=20) as client:
-        print(f"Verifying token {settings.app_base_url}/api/quick-token-verify, Bearer {token}.................")
+        print(
+            f"Verifying token {settings.app_base_url}/api/quick-token-verify, Bearer {token}................."
+        )
         response = await client.get(
             settings.app_base_url + "/api/quick-token-verify",
-            headers={"Authorization": f"Bearer {token}"})
+            headers={"Authorization": f"Bearer {token}"},
+        )
         if response.status_code != 200:
             raise HTTPException(status_code=401, detail="Invalid token")
         return response.json()

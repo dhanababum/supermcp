@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Tenants SQL Database Connector
+  tenants-sqldb-connector:
+    build:
+      context: ..
+      dockerfile: connectors/tenants_sqldb/Dockerfile.dev
+    environment:
+      CONNECTOR_SECRET: your-connector-secret
+      CONNECTOR_ID: your-connector-id
+      API_BASE_URL: http://localhost:9001
+      API_WEB_URL: http://localhost:3000
+      PORT: 8026
+    ports:
+      - "8026:8026"
+    volumes:
+      # Mount mcp_pkg for hot reload during development
+      - ../mcp_pkg:/app/mcp_pkg
+      # Mount connector code for hot reload
+      - ../connectors/tenants_sqldb:/app
+    networks:
+      - mcp-tools-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8026/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  mcp-tools-network:
+    driver: bridge

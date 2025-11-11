@@ -26,6 +26,7 @@ export const useConnectors = (shouldFetch = true) => {
         description: connector.description,
         version: connector.version,
         url: connector.url,
+        logo_name: connector.logo_name,
         mode: connector.mode, // Include mode field for proper mode display
         status: connector.is_active ? 'Active' : 'Inactive',
         created_at: connector.created_at,

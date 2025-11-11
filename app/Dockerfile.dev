@@ -32,8 +32,6 @@ RUN uv sync --frozen
 # Copy application code
 COPY . .
 
-# Create media directory for logos
-RUN mkdir -p media/logos
 
 # Set proper permissions for migration script (if it exists)
 RUN chmod +x ./migrate.sh

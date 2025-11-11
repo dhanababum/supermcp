@@ -12,13 +12,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
+from starlette.responses import FileResponse
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict, List
 
 from src.config import settings
 from src.database import get_async_session
-from src.utils import store_logo
+from src.utils import get_logo, store_logo
 from src.datatypes import (
     McpServerToolItem,
     ToolType,
@@ -53,6 +54,7 @@ app = FastAPI(title="MCP Tools API", description="API for MCP Tools", version="0
 
 
 token_header = HTTPBearer()
+APP_MEDIA_PATH = os.path.join(settings.APP_STORAGE_PATH, "media")
 
 
 # create auth dependency & verify with McpServerToken
@@ -275,7 +277,11 @@ def read_root():
 
 
 @app.post("/register-connector")
-def register_connector(req: RegisterRequest, session: AsyncSession = Depends(get_async_session)):
+def register_connector(
+    req: RegisterRequest,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+):
     secret = uuid.uuid4().hex  # show once to user
     secret_hash = bcrypt.hashpw(
         secret.encode(), settings.CONNECTOR_SALT.encode()).decode()
@@ -298,6 +304,19 @@ async def quick_token_verify(_: str = Depends(verify_token)):
     return {"message": "Token verified"}
 
 
+@router.get(
+    "/connectors/{connector_logo}",
+    response_class=FileResponse,
+)
+async def get_connector_logo(connector_logo: str):
+    try:
+        return await get_logo(APP_MEDIA_PATH, connector_logo)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Logo not found: {connector_logo}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading logo: {str(e)}")
+
+
 @router.get("/connectors")
 async def get_connectors(
     session: AsyncSession = Depends(get_async_session),
@@ -317,7 +336,7 @@ async def get_connectors(
                     "url": connector.url,
                     "description": connector.description,
                     "version": connector.version,
-                    "logo_url": connector.logo_url,
+                    "logo_name": connector.logo_name,
                     "mode": (
                         connector.mode
                         if isinstance(connector.mode, str)
@@ -422,7 +441,7 @@ async def register_connector(
             "description": request.description,
             "version": "0.0.0",
             "source_logo_url": b"",
-            "logo_url": "",
+            "logo_name": "",
             "mode": ConnectorMode.sync.value,
             "secret": secret_hash,
             "tools_config": [],
@@ -489,16 +508,17 @@ async def activate_connector(
 
         # Fetch connector schema from URL
         try:
-            req = requests.get(f"{request.connector_url}/connector.json", timeout=10)
-            if req.status_code != 200:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Failed to fetch connector schema from {request.connector_url}. Status: {req.status_code}",
-                )
-            connector_data = req.json()
-        except requests.exceptions.RequestException as e:
+            async with httpx.AsyncClient() as client:
+                req = await client.get(f"{request.connector_url}/connector.json", timeout=10)
+                if req.status_code != 200:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Failed to fetch connector schema from {request.connector_url}. Status: {req.status_code}",
+                    )
+                connector_data = req.json()
+        except Exception as e:
             raise HTTPException(
-                status_code=400, detail=f"Failed to connect to connector URL: {str(e)}"
+                status_code=400, detail=f"Failed to fetch connector schema: {str(e)}"
             )
 
         # Extract schema data
@@ -514,7 +534,6 @@ async def activate_connector(
         connector.url = request.connector_url
         connector.description = description
         connector.version = version
-        connector.logo_url = logo_url
         connector.source_logo_url = logo_url.encode() if logo_url else b""
         connector.tools_config = tools
         connector.templates_config = templates
@@ -529,9 +548,16 @@ async def activate_connector(
         # Store logo if available
         if logo_url and logo_url.strip():
             try:
-                store_logo(logo_url, connector.name)
+                logo_name = await store_logo(
+                    f"{connector.url}{logo_url}", APP_MEDIA_PATH, f"connector_{connector.id}")
+                # Ensure logo_name is never None (use empty string as fallback)
+                connector.logo_name = logo_name if logo_name else ""
+                session.add(connector)
+                await session.commit()
+                await session.refresh(connector)
             except Exception as e:
-                print(f"Warning: Failed to store logo: {str(e)}")
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to store logo: {str(e)}")
 
         return {
             "status": "activated",
@@ -626,62 +652,6 @@ async def update_connector_mode(
         raise HTTPException(
             status_code=500, detail=f"Failed to update connector mode: {str(e)}"
         )
-
-
-@router.post("/connectors")
-async def create_connector(
-    request: CreateConnectorRequest,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(require_superuser()),
-) -> dict:
-    """
-    DEPRECATED: Use /connectors/register and /connectors/activate instead.
-    This endpoint is kept for backward compatibility.
-    """
-    req = requests.get(f"{request.connector_url}/connector.json")
-    if req.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to get connector schema")
-    connector_data = req.json()
-
-    # Extract required fields with defaults
-    name = connector_data.get("name", "Unknown Connector")
-    tools = connector_data.get("tools", [])
-    templates = connector_data.get("templates", {})
-    server_config = connector_data.get("config", {})
-
-    connector_data = {
-        "url": request.connector_url,
-        "description": connector_data.get("description", "No description available"),
-        "version": connector_data.get("version", "1.0.0"),
-        "source_logo_url": (
-            connector_data.get("logo_url", "").encode()
-            if connector_data.get("logo_url")
-            else b""
-        ),
-        "logo_url": connector_data.get("logo_url", ""),
-        "name": name,
-        "tools_config": tools,
-        "templates_config": templates,
-        "server_config": server_config,
-    }
-    data = await create_connector_record(connector_data, session, current_user.id)
-    logo_url = connector_data.get("logo_url", "")
-    if logo_url and logo_url.strip():
-        try:
-            store_logo(logo_url, data.name)
-        except Exception as e:
-            print(f"Warning: Failed to store logo: {str(e)}")
-
-    return {
-        "id": data.id,
-        "name": data.name,
-        "url": data.url,
-        "description": data.description,
-        "version": data.version,
-        "created_at": data.created_at.isoformat(),
-        "updated_at": data.updated_at.isoformat(),
-        "is_active": data.is_active,
-    }
 
 
 @router.delete("/connectors/{connector_id}")
@@ -1041,9 +1011,8 @@ async def create_server(
 
     token_data = await get_token(mcp_server.id)
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        print(mcp_server.server_url)
-        print(token_data['access_token'])
+    async with httpx.AsyncClient(timeout=100) as client:
+
         response = await client.post(
             f"{mcp_server.server_url}/create-server/{mcp_server.id}",
             headers={"Authorization": f"Bearer {token_data['access_token']}"},
@@ -1171,7 +1140,7 @@ async def get_server(
 
 @router.put("/servers/{server_id}")
 async def update_server(
-    server_id: int,
+    server_id: str,
     config_data: dict,
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(current_active_user),

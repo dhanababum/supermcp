@@ -1,19 +1,35 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import SuperuserActions from './SuperuserActions';
-import { api } from '../../../services/api';
+import { api, API_BASE_URL } from '../../../services/api';
 import Notification from '../../../components/common/Notification';
 
 const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegisterUrl }) => {
   const { isSuperuser } = useAuth();
   const [updating, setUpdating] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [logoError, setLogoError] = useState(false);
   
   // Determine mode status
   const mode = connector.mode || 'unknown';
   const isDeactive = mode === 'deactive';
   const isActive = mode === 'active';
   const isSyncMode = mode === 'sync';
+
+  // Get logo URL if available
+  const logoUrl = connector.logo_name && connector.logo_name.trim() 
+    ? `${API_BASE_URL}/api/connectors/${encodeURIComponent(connector.logo_name)}`
+    : null;
+
+  // Debug: log logo info
+  React.useEffect(() => {
+    if (connector.logo_name) {
+      console.log('Connector logo_name:', connector.logo_name);
+      console.log('Logo URL:', logoUrl);
+    } else {
+      console.log('No logo_name for connector:', connector.name, connector.logo_name);
+    }
+  }, [connector.logo_name, logoUrl, connector.name]);
 
   // Handle mode toggle for active/deactive connectors
   const handleModeToggle = async (newMode) => {
@@ -59,10 +75,22 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
 
       <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
         <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-          </svg>
+        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center overflow-hidden">
+          {logoUrl && !logoError ? (
+            <img 
+              src={logoUrl} 
+              alt={`${connector.name} logo`}
+              className="w-full h-full object-contain p-1"
+              onError={(e) => {
+                console.error('Failed to load logo:', logoUrl, e);
+                setLogoError(true);
+              }}
+            />
+          ) : (
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            </svg>
+          )}
         </div>
         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
           isActive 

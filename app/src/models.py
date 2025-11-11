@@ -54,7 +54,11 @@ class McpConnector(SQLModel, AsyncAttrs, table=True):
     description: str = Field(description="The connector description")
     version: str = Field(description="The connector version")
     source_logo_url: bytes = Field(description="The connector logo")
-    logo_url: str = Field(description="The connector logo")
+    logo_name: str = Field(
+        default="",
+        sa_column=Column(String, nullable=False, server_default=""),
+        description="The connector logo name",
+    )
     mode: ConnectorMode = Field(
         default=ConnectorMode.sync,
         sa_column=Column(String(20), nullable=False, default="sync"),

@@ -29,7 +29,8 @@ mcp, app = create_dynamic_mcp(
     name="tenants_sqldb",
     config=TenantSqlDbConfig,
     version="1.0.0",
-    logo_file_path=os.path.join(os.path.dirname(__file__), "logo.png"),
+    logo_file_path=os.path.join(
+        os.path.dirname(__file__), "media/storage_tenant_db.png"),
 )
 
 # Register UI schema for form rendering

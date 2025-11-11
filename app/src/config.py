@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ASYNC_DATABASE_URL: str
     JWT_SECRET: str
     JWT_ALGO: str
-    LOGO_STORAGE_PATH: str = "media/logos"
+    APP_STORAGE_PATH: str = "./app-storage"
     LOGO_STORAGE_TYPE: LogoStorageType = LogoStorageType.FILESYSTEM
     SUPERUSER_EMAIL: str | None = None
     SUPERUSER_PASSWORD: str | None = None

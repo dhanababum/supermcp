@@ -58,6 +58,6 @@ class ConnectorConfig(BaseModel):
     params: Type[BaseModel] | dict
     ui_schema: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="UI Schema hints for form rendering (RJSF uiSchema format)"
+        description="UI Schema hints for form rendering (RJSF uiSchema format)",
     )
     model_config = ConfigDict(extra="forbid")

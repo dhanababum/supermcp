@@ -1,0 +1,55 @@
+# Development Dockerfile with hot reload support
+# 
+# Build from workspace root:
+#   docker build -f connectors/tenants_sqldb/Dockerfile.dev -t tenants-sqldb:dev .
+#
+# Or use docker-compose with proper build context
+
+FROM python:3.12.2-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PATH="/app/.venv/bin:$PATH" \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+# Includes database driver dependencies for PostgreSQL, MySQL, MSSQL
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gettext-base \
+    libpq-dev \
+    default-libmysqlclient-dev \
+    unixodbc-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for faster dependency management
+RUN pip install uv
+
+# Copy mcp_pkg dependency (required by pyproject.toml path dependency)
+# This requires building from workspace root context
+COPY mcp_pkg /app/mcp_pkg
+
+# Copy dependency files from connector directory
+COPY connectors/tenants_sqldb/pyproject.toml connectors/tenants_sqldb/uv.lock ./
+
+# Install Python dependencies using uv
+RUN uv sync --frozen
+
+# Copy application code from connector directory
+COPY connectors/tenants_sqldb/ ./
+
+# Create media directory for logos
+RUN mkdir -p media
+
+# Expose port (connector runs on 8026)
+EXPOSE 8026
+
+# Default command with reload enabled for development
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8026", "--reload"]
