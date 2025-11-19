@@ -11,6 +11,7 @@ services:
       CONNECTOR_ID: your-connector-id
       API_BASE_URL: http://localhost:9001
       API_WEB_URL: http://localhost:3000
+      WORKERS: 3
       PORT: 8026
     ports:
       - "8026:8026"
@@ -23,6 +24,32 @@ services:
       - mcp-tools-network
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8026/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+  
+  # PostgreSQL Database Connector
+  postgres-connector:
+    build:
+      context: ..
+      dockerfile: connectors/postgres/Dockerfile.dev
+    environment:
+      CONNECTOR_SECRET: your-connector-secret
+      CONNECTOR_ID: your-connector-id
+      API_BASE_URL: http://localhost:9001
+      API_WEB_URL: http://localhost:3000
+      PORT: 8027
+      WORKERS: 3
+    ports:
+      - "8027:8027"
+    volumes:
+      - ../mcp_pkg:/app/mcp_pkg
+      - ../connectors/postgres:/app
+    networks:
+      - mcp-tools-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8027/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

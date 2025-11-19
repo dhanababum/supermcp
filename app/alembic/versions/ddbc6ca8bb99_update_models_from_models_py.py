@@ -25,9 +25,20 @@ def upgrade() -> None:
     op.alter_column('connector_access', 'connector_id',
                existing_type=sa.UUID(),
                nullable=True)
-    op.add_column('mcp_connectors', sa.Column('logo_name', String(), nullable=False, server_default=''))
-    op.drop_index(op.f('uq_mcp_connectors_secret_md5'), table_name='mcp_connectors', postgresql_where='(secret IS NOT NULL)')
-    op.drop_column('mcp_connectors', 'logo_url')
+    # Add logo_name column if it doesn't exist
+    try:
+        op.add_column('mcp_connectors', sa.Column('logo_name', String(), nullable=False, server_default=''))
+    except Exception:
+        pass  # Column already exists
+    
+    # Drop index if it exists
+    op.drop_index(op.f('uq_mcp_connectors_secret_md5'), table_name='mcp_connectors', postgresql_where='(secret IS NOT NULL)', if_exists=True)
+    
+    # Drop logo_url column if it exists
+    try:
+        op.drop_column('mcp_connectors', 'logo_url')
+    except Exception:
+        pass  # Column doesn't exist
     op.alter_column('mcp_servers', 'connector_id',
                existing_type=sa.UUID(),
                nullable=True)
@@ -40,9 +51,25 @@ def downgrade() -> None:
     op.alter_column('mcp_servers', 'connector_id',
                existing_type=sa.UUID(),
                nullable=False)
-    op.add_column('mcp_connectors', sa.Column('logo_url', sa.VARCHAR(), autoincrement=False, nullable=False))
-    op.create_index(op.f('uq_mcp_connectors_secret_md5'), 'mcp_connectors', [sa.literal_column('md5(secret::text)')], unique=True, postgresql_where='(secret IS NOT NULL)')
-    op.drop_column('mcp_connectors', 'logo_name')
+    
+    # Add logo_url column if it doesn't exist
+    try:
+        op.add_column('mcp_connectors', sa.Column('logo_url', sa.VARCHAR(), autoincrement=False, nullable=False))
+    except Exception:
+        pass  # Column already exists
+    
+    # Create index if it doesn't exist
+    try:
+        op.create_index(op.f('uq_mcp_connectors_secret_md5'), 'mcp_connectors', [sa.literal_column('md5(secret::text)')], unique=True, postgresql_where='(secret IS NOT NULL)')
+    except Exception:
+        pass  # Index already exists
+    
+    # Drop logo_name column if it exists
+    try:
+        op.drop_column('mcp_connectors', 'logo_name')
+    except Exception:
+        pass  # Column doesn't exist
+    
     op.alter_column('connector_access', 'connector_id',
                existing_type=sa.UUID(),
                nullable=False)

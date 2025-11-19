@@ -35,32 +35,32 @@ RUN pip install uv
 COPY mcp_pkg /workspace/mcp_pkg
 
 # Create the connector directory structure
-RUN mkdir -p /workspace/connectors/tenants_sqldb
+RUN mkdir -p /workspace/connectors/postgres
 
 # Copy dependency files to maintain relative path structure
-COPY connectors/tenants_sqldb/pyproject.toml connectors/tenants_sqldb/uv.lock /workspace/connectors/tenants_sqldb/
+COPY connectors/postgres/pyproject.toml connectors/postgres/uv.lock /workspace/connectors/postgres/
 
 # Change to connector directory for uv sync
-WORKDIR /workspace/connectors/tenants_sqldb
+WORKDIR /workspace/connectors/postgres
 
 # Install Python dependencies using uv
 RUN uv sync --frozen
 
 # Copy application code to the workspace structure
-COPY connectors/tenants_sqldb/ /workspace/connectors/tenants_sqldb/
+COPY connectors/postgres/ /workspace/connectors/postgres/
 
 # Set proper permissions for entrypoint script
-RUN chmod +x /workspace/connectors/tenants_sqldb/entrypoint.sh
+RUN chmod +x /workspace/connectors/postgres/entrypoint.sh
 
 # Set work directory to the connector directory
-WORKDIR /workspace/connectors/tenants_sqldb
+WORKDIR /workspace/connectors/postgres
 
 # Update PATH to include the venv from the workspace location
-ENV PATH="/workspace/connectors/tenants_sqldb/.venv/bin:$PATH" \
-    PYTHONPATH="/workspace/connectors/tenants_sqldb"
+ENV PATH="/workspace/connectors/postgres/.venv/bin:$PATH" \
+    PYTHONPATH="/workspace/connectors/postgres"
 
-# Expose port (connector runs on 8026)
-EXPOSE 8026
+# Expose port (connector runs on 8027)
+EXPOSE 8027
 
 # Default command with reload enabled for development
 CMD ["sh", "entrypoint.sh"]

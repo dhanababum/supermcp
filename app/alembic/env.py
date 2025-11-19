@@ -84,13 +84,12 @@ async def run_migrations_online():
     In this scenario we need to create an Engine
     and associate a connection with the context.
     """
-    print(f"Running migrations online: {database_url}")
+    print("Running migrations online")
     connectable = create_async_engine(database_url, echo=True, future=True)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
 
-print("Running migrations online...........", context.is_offline_mode())
 if context.is_offline_mode():
     run_migrations_offline()
 else:

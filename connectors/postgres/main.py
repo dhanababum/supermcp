@@ -14,9 +14,9 @@ from schema import (
     SelectQueryTemplate,
     InsertQueryTemplate,
     ExecuteQueryParams,
-    TenantSqlDbConfig,
+    PostgresConfig,
 )
-from db_manager import DatabaseConnectionManager
+from db_manager import PoolManager
 
 
 # Configure logging
@@ -26,19 +26,18 @@ logger = logging.getLogger(__name__)
 
 # Create MCP server instance
 mcp, app = create_dynamic_mcp(
-    name="tenants_sqldb",
-    config=TenantSqlDbConfig,
+    name="postgresql",
+    config=PostgresConfig,
     version="1.0.0",
     logo_file_path=os.path.join(
-        os.path.dirname(__file__), "media/storage_tenant_db.png"),
+        os.path.dirname(__file__), "media/postgresql-48.png"),
 )
 
 # Register UI schema for form rendering
 ui_schema = {
-    "db_type": {"ui:help": "Select the database type you want to connect to"},
     "host": {
         "ui:widget": "text",
-        "ui:placeholder": "localhost or db.example.com",
+        "ui:placeholder": "localhost",
         "ui:help": "Database server hostname or IP address",
     },
     "port": {
@@ -77,11 +76,12 @@ mcp.register_ui_schema(ui_schema)
 
 # Dictionary to store database connections per server
 # Structure: Dict[server_id, DatabaseConnectionManager]
-dbs: Dict[str, DatabaseConnectionManager] = {}
+pool_manager: PoolManager = PoolManager()
+pool_manager.cleanup_loop()
 
 
 @mcp.on_server_create()
-async def on_server_start(server_id: str, server_config: TenantSqlDbConfig):
+async def on_server_start(server_id: str, server_config: PostgresConfig):
     """
     Initialize database connection when MCP server starts.
     This is called once when a server is created with specific configuration.
@@ -89,29 +89,13 @@ async def on_server_start(server_id: str, server_config: TenantSqlDbConfig):
     """
     try:
         logger.info(
-            f"Initializing database connection for {server_config.db_type}"
+            f"Initializing database connection for {server_config.database}"
         )
 
-        db_manager = DatabaseConnectionManager(
-            db_type=server_config.db_type,
-            host=server_config.host,
-            port=server_config.port,
-            database=server_config.database,
-            username=server_config.username,
-            password=server_config.password,
-            additional_params=server_config.additional_params,
-            pool_size=server_config.pool_size,
-            max_overflow=server_config.max_overflow,
-        )
-
-        # Establish connection
-        await db_manager.connect()
-
-  
+        await pool_manager.get_pool(server_id, server_config)
 
         # Use db_name from config, default to "default"
         db_name = server_config.db_name or "default"
-        dbs[server_id] = db_manager
 
         logger.info(
             f"Database connection established successfully "
@@ -130,22 +114,8 @@ async def on_server_stop():
     Handles multiple database instances per server.
     """
     server_id = get_current_server_id()
-    if server_id not in dbs:
-        logger.warning(f"No databases found for server {server_id}")
-        return
-
-    try:
-        db_name = get_current_server_config(app, server_id).db_name
-        db_manager = dbs[server_id]
-        logger.info(
-            f"Closing database connection: {db_name} for server {server_id}")
-        await db_manager.disconnect()
-
-        # Remove server entry
-        del dbs[server_id]
-        logger.info(f"All database connections closed for server {server_id}")
-    except Exception as e:
-        logger.error(f"Error during database disconnect: {str(e)}")
+    await pool_manager.close_pool(server_id)
+    logger.info(f"Closing database connection for server {server_id}")
 
 
 @mcp.tool()
@@ -157,14 +127,10 @@ async def list_tables() -> list[str]:
         db_name: Identifier for the database instance (default: "default")
     """
     server_id = get_current_server_id()
-    db_name = get_current_server_config(app, server_id).db_name
-    logger.info(f"Listing tables for server {server_id}, db: {db_name}")
+    server_config = get_current_server_config(app, server_id)
+    logger.info(f"Listing tables for server {server_id}, db: {server_config.database}")
 
-    if server_id not in dbs:
-        raise ValueError(f"No databases found for server {server_id}")
-
-    db_manager: DatabaseConnectionManager = dbs[server_id]
-    return await db_manager.get_tables()
+    return await pool_manager.get_tables(server_id, server_config)
 
 
 @mcp.tool()
@@ -182,10 +148,9 @@ async def get_table_schema(
         JSON string with table schema information
     """
     server_id = get_current_server_id()
-    if server_id not in dbs:
-        raise ValueError(f"No databases found for server {server_id}")
-    db_manager: DatabaseConnectionManager = dbs[server_id]
-    _schema = await db_manager.get_table_schema(table_name)
+    server_config = get_current_server_config(app, server_id)
+    _schema = await pool_manager.get_table_schema(
+        server_id, server_config, table_name)
     return _schema
 
 
@@ -210,13 +175,11 @@ async def execute_query(
         For INSERT/UPDATE/DELETE: List with affected_rows count
     """
     server_id = get_current_server_id()
-    if server_id not in dbs:
-        raise ValueError(f"No databases found for server {server_id}")
-
-    db_manager: DatabaseConnectionManager = dbs[server_id]
+    server_config = get_current_server_config(app, server_id)
     # Validate using ExecuteQueryParams for type safety
     validated = ExecuteQueryParams(query=query, params=params)
-    return await db_manager.execute_query(validated.query, validated.params)
+    return await pool_manager.execute_query(
+        server_id, server_config, validated.query, validated.params)
 
 
 @mcp.tool()
@@ -235,12 +198,10 @@ async def test_connection() -> Dict[str, Any]:
         settings
     """
     server_id = get_current_server_id()
-    db_name = get_current_server_config(app, server_id).db_name
-    if server_id not in dbs:
-        raise ValueError(f"No databases found for server {server_id}")
-    db_manager: DatabaseConnectionManager = dbs[server_id]
-    logger.info(f"Testing connection for server {server_id}, db: {db_name}")
-    return await db_manager.test_connection()
+    server_config = get_current_server_config(app, server_id)
+    logger.info(
+        f"Testing connection for server {server_id}, db: {server_config.database}")
+    return await pool_manager.test_connection(server_id, server_config)
 
 
 @mcp.template(name="select_query", params_model=SelectQueryTemplate)
@@ -264,11 +225,7 @@ async def select_query(
         JSON string representation of query results
     """
     server_id = get_current_server_id()
-    if server_id not in dbs:
-        raise ValueError(f"No databases found for server {server_id}")
-
-    db_manager: DatabaseConnectionManager = dbs[server_id]
-
+    server_config = get_current_server_config(app, server_id)
     # Format query with kwargs if provided
     formatted_query = (
         params.sql_query.format(**kwargs) if kwargs else params.sql_query
@@ -288,7 +245,8 @@ async def select_query(
                 formatted_query.rstrip() + f" LIMIT {params.limit}"
             )
 
-    results = await db_manager.execute_query(formatted_query)
+    results = await pool_manager.execute_query(
+        server_id, server_config, formatted_query)
     return str(results)
 
 
@@ -314,11 +272,7 @@ async def insert_query(
         JSON string representation of insertion result (affected_rows)
     """
     server_id = get_current_server_id()
-    if server_id not in dbs:
-        raise ValueError(f"No databases found for server {server_id}")
-
-    db_manager: DatabaseConnectionManager = dbs[server_id]
-
+    server_config = get_current_server_config(app, server_id)
     # Build INSERT query
     values_list = [val.strip() for val in params.values.split(",")]
 
@@ -345,9 +299,9 @@ async def insert_query(
     }
 
     # Execute query with parameters
-    results = await db_manager.execute_query(
-        query, query_params if query_params else None
-    )
+    results = await pool_manager.execute_query(
+        server_id, server_config, query,
+        query_params if query_params else None)
     return str(results)
 
 
@@ -357,7 +311,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=int(os.getenv("PORT", "8026")),
-        reload=False,
-        workers=int(os.getenv("WORKERS", "1")),
+        port=int(os.getenv("PORT", "8027")),
+        reload=False, workers=int(os.getenv("WORKERS", "1")),
     )

@@ -30,6 +30,7 @@ services:
       JWT_ALGO: HS256
       CONNECTOR_SALT: $2b$12$RUWL7I0Nk/n3ohBgomOOO.
       LOGO_STORAGE_PATH: media/logos
+      APP_STORAGE_PATH: app-storage
       LOGO_STORAGE_TYPE: filesystem
       PORT: 9000
       WEB_URL: http://localhost:3001
@@ -41,7 +42,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ../app/media:/app/media
+      - ../app/storage:/app/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9001/api/"]
       interval: 30s

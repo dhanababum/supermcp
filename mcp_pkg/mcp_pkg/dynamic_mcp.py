@@ -4,7 +4,7 @@ from functools import partial
 import os
 import re
 import threading
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.server.dependencies import get_http_request
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -229,6 +229,13 @@ def create_dynamic_mcp(
 
     async def get_logo(request: Request):
         return FileResponse(os.path.join(mcp._logo_file_path))
+    
+    # @mcp.custom_route("/create-tool/{tool_id}", methods=["GET"])
+    # async def create_new_mcp_tool(request: Request, ctx: Context):
+    #     tool_id = request.path_params["tool_id"]
+    #     print(f"Creating new tool {tool_id}")
+    #     mcp.add_tool(tool_id)
+    #     return JSONResponse({"message": f"Tool {tool_id} created"})
 
     async def create_new_mcp_server(request: Request):
         """Endpoint to dynamically create and mount a new server."""
@@ -294,6 +301,11 @@ def create_dynamic_mcp(
         methods=["POST"],
         route=destroy_mcp_server,
     )
+    # app.add_route(
+    #     path="/create-tool/{tool_id}",
+    #     methods=["POST"],
+    #     route=create_new_mcp_tool,
+    # )
     print(app.routes)
     return mcp, app
 
