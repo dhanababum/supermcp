@@ -18,6 +18,7 @@ const API_ROUTES = {
   servers: '/api/servers',
   server: (id) => `/api/servers/${id}`,
   serverTools: (id) => `/api/servers/${id}/tools`,
+  serversWithTokens: '/api/servers/with-tokens',
 };
 
 // Default fetch options with credentials
@@ -274,6 +275,10 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(updateData),
     });
+  },
+
+  getServersWithTokens: async () => {
+    return apiRequest(API_ROUTES.serversWithTokens);
   },
 };
 

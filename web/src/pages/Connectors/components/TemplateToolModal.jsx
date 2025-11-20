@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import Notification from '../../components/common/Notification';
+import { API_BASE_URL } from '../../../constants/env';
 
 const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
   const [templates, setTemplates] = useState([]);
@@ -74,7 +75,7 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
       };
 
       // Call the API to create the tool
-      const response = await fetch('http://localhost:9000/api/tools/from-template', {
+      const response = await fetch(`${API_BASE_URL}/api/tools/from-template`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

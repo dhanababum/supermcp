@@ -22,12 +22,12 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 
-
 UserBase = declarative_base()
 
 
 class User(SQLAlchemyBaseUserTableUUID, UserBase):
     __tablename__ = "user"
+    __table_args__ = {"extend_existing": True}
 
 
 class McpConnector(SQLModel, AsyncAttrs, table=True):

@@ -12,6 +12,7 @@ dependencies = [
     "fastapi-mcp>=0.4.0",
     "fastapi-users>=14.0.1",
     "fastapi-users-db-sqlalchemy>=7.0.0",
+    "fastapi-users-db-sqlmodel>=0.3.0",
     "pillow>=11.3.0",
     "psycopg2-binary>=2.9.10",
     "python-dateutil>=2.9.0.post0",

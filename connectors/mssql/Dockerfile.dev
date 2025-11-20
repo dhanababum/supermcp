@@ -1,0 +1,92 @@
+# Development Dockerfile with hot reload support
+# 
+# Build from workspace root:
+#   docker build -f connectors/mssql/Dockerfile.dev -t mssql:dev .
+#
+# Or use docker-compose with proper build context
+
+FROM python:3.12.2-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Set initial work directory
+WORKDIR /workspace
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gettext-base \
+    curl \
+    wget \
+    apt-transport-https \
+    gnupg2 \
+    ca-certificates \
+    lsb-release \
+    unixodbc-dev \
+    unixodbc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Microsoft repository and install ODBC Driver 18 for SQL Server
+RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | \
+    gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && curl -fsSL https://packages.microsoft.com/config/debian/12/prod.list | \
+    tee /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y \
+        msodbcsql18 \
+        mssql-tools18 \
+    && echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> ~/.bashrc \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify ODBC Driver installation and library exists
+RUN odbcinst -q -d -n "ODBC Driver 18 for SQL Server" && \
+    echo "✅ ODBC Driver 18 for SQL Server is configured" && \
+    DRIVER_LIB=$(find /opt/microsoft/msodbcsql18 -name "libmsodbcsql-*.so*" | head -1) && \
+    echo "Driver library found at: $DRIVER_LIB" && \
+    test -f "$DRIVER_LIB" || (echo "ERROR: Driver library not found!" && exit 1)
+
+# Install uv for faster dependency management
+RUN pip install uv
+
+# Copy mcp_pkg to the expected location (two levels up from connector)
+# This requires building from workspace root context
+COPY mcp_pkg /workspace/mcp_pkg
+
+# Create the connector directory structure
+RUN mkdir -p /workspace/connectors/mssql
+
+# Copy dependency files to maintain relative path structure
+COPY connectors/mssql/pyproject.toml /workspace/connectors/mssql/
+
+# Change to connector directory for uv sync
+WORKDIR /workspace/connectors/mssql
+
+# Install Python dependencies using uv
+RUN uv sync --frozen || uv sync
+
+# Copy application code to the workspace structure
+COPY connectors/mssql/ /workspace/connectors/mssql/
+
+# Set proper permissions for entrypoint script
+RUN chmod +x /workspace/connectors/mssql/entrypoint.sh
+
+# Set work directory to the connector directory
+WORKDIR /workspace/connectors/mssql
+
+# Update PATH to include the venv and SQL Server tools
+ENV PATH="/workspace/connectors/mssql/.venv/bin:/opt/mssql-tools18/bin:$PATH" \
+    PYTHONPATH="/workspace/connectors/mssql" \
+    ODBCSYSINI=/etc \
+    ODBCINI=/etc/odbc.ini
+
+# Expose port (connector runs on 8028)
+EXPOSE 8028
+
+# Default command with reload enabled for development
+CMD ["sh", "entrypoint.sh"]
+

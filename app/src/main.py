@@ -276,29 +276,6 @@ def read_root():
     return {"message": "Hello, World!"}
 
 
-@app.post("/register-connector")
-def register_connector(
-    req: RegisterRequest,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(current_active_user),
-):
-    secret = uuid.uuid4().hex  # show once to user
-    secret_hash = bcrypt.hashpw(
-        secret.encode(), settings.CONNECTOR_SALT.encode()).decode()
-
-    connector = McpConnector(
-        name=req.name,
-        secret=secret_hash,
-        mode=ConnectorMode.sync.value,  # Convert enum to string value
-        created_at=datetime.utcnow(),
-    )
-    session.add(connector)
-    session.commit()
-    session.refresh(connector)
-    # Return connector id + secret (only displayed once in UI)
-    return {"connector_id": connector.id, "secret": secret}
-
-
 @router.get("/quick-token-verify")
 async def quick_token_verify(_: str = Depends(verify_token)):
     return {"message": "Token verified"}
@@ -418,7 +395,8 @@ async def register_connector(
         # Check if connector with this name already exists
         existing = await session.execute(
             select(McpConnector).where(
-                McpConnector.name == request.name, McpConnector.is_active.is_(True)
+                McpConnector.name == request.name,
+                McpConnector.is_active.is_(True)
             )
         )
         existing = existing.scalars().first()
@@ -431,6 +409,8 @@ async def register_connector(
 
         # Generate a unique secret for the connector
         secret_plain = uuid.uuid4().hex  # Generate a random secret
+        print(f"Secret plain: {secret_plain}")
+        print(f"Connector salt: {settings.CONNECTOR_SALT}")
         secret_hash = bcrypt.hashpw(
             secret_plain.encode(), settings.CONNECTOR_SALT.encode())
 
@@ -472,7 +452,7 @@ async def register_connector(
     except HTTPException:
         raise
     except Exception as e:
-        session.rollback()
+        await session.rollback()
         raise HTTPException(
             status_code=500, detail=f"Failed to register connector: {str(e)}"
         )
@@ -1065,11 +1045,17 @@ async def list_all_servers(
 
 
 @router.get("/servers/with-tokens")
-async def get_servers_with_tokens(session: AsyncSession = Depends(get_async_session)) -> List[dict]:
+async def get_servers_with_tokens(
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> List[dict]:
     """
     Retrieve all active MCP servers with their active tokens.
     """
-    statement = select(McpServer).where(McpServer.is_active.is_(True))
+    statement = select(McpServer).where(
+        McpServer.is_active.is_(True),
+        McpServer.user_id == current_user.id,
+    )
     servers = await session.execute(statement)
     servers = servers.scalars().all()
 
@@ -1111,13 +1097,15 @@ async def get_servers_with_tokens(session: AsyncSession = Depends(get_async_sess
 
 @router.get("/servers/{server_id}")
 async def get_server(
-    server_id: str, session: AsyncSession = Depends(get_async_session)
+    server_id: str,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
 ) -> dict:
     """
     Retrieve the active configuration for a specific server.
     """
     statement = select(McpServer).where(
-        McpServer.id == server_id, McpServer.is_active.is_(True)
+        McpServer.id == server_id, McpServer.is_active.is_(True), McpServer.user_id == current_user.id,
     )
     config = await session.execute(statement)
     config: McpServer = config.scalars().first()
@@ -1187,7 +1175,11 @@ async def update_server(
 
 
 @router.delete("/servers/{server_id}")
-async def delete_server(server_id: str, session: AsyncSession = Depends(get_async_session)) -> dict:
+async def delete_server(
+    server_id: str,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> dict:
     """
     Soft delete a server configuration and all related data (marks as inactive).
     This includes the server, all its tokens, and all its tools.
@@ -1195,7 +1187,7 @@ async def delete_server(server_id: str, session: AsyncSession = Depends(get_asyn
     try:
         # Get the server
         statement = select(McpServer).where(
-            McpServer.id == server_id, McpServer.is_active.is_(True)
+            McpServer.id == server_id, McpServer.is_active.is_(True), McpServer.user_id == current_user.id,
         )
         server = await session.execute(statement)
         server: McpServer = server.scalars().first()
@@ -1244,14 +1236,18 @@ async def delete_server(server_id: str, session: AsyncSession = Depends(get_asyn
 
 @router.get("/servers/{server_id}/tokens")
 async def get_server_tokens(
-    server_id: str, session: AsyncSession = Depends(get_async_session)
+    server_id: str,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
 ) -> List[dict]:
     """
     Retrieve all active tokens for a specific server.
     """
     # First check if the server exists
     server_statement = select(McpServer).where(
-        McpServer.id == server_id, McpServer.is_active.is_(True)
+        McpServer.id == server_id,
+        McpServer.is_active.is_(True),
+        McpServer.user_id == current_user.id,
     )
     server = await session.execute(server_statement)
     server: McpServer = server.scalars().first()
@@ -1486,7 +1482,11 @@ async def update_server_token(
 
 
 @router.get("/servers/{server_id}/tools/database")
-async def get_database_tools(server_id: int, session: AsyncSession = Depends(get_async_session)) -> dict:
+async def get_database_tools(
+    server_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> dict:
     """
     Retrieve tools from database with tool_type information.
     """

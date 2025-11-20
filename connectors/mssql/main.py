@@ -1,4 +1,4 @@
-"""Tenants SQL Database MCP Connector - Main Entry Point"""
+"""MSSQL/Azure SQL Database MCP Connector - Main Entry Point"""
 
 from mcp_pkg.dynamic_mcp import (
     create_dynamic_mcp,
@@ -14,7 +14,7 @@ from schema import (
     SelectQueryTemplate,
     InsertQueryTemplate,
     ExecuteQueryParams,
-    PostgresConfig,
+    MSSQLConfig,
 )
 from db_manager import PoolManager
 
@@ -26,23 +26,23 @@ logger = logging.getLogger(__name__)
 
 # Create MCP server instance
 mcp, app = create_dynamic_mcp(
-    name="postgresql",
-    config=PostgresConfig,
+    name="mssql",
+    config=MSSQLConfig,
     version="1.0.0",
     logo_file_path=os.path.join(
-        os.path.dirname(__file__), "media/postgresql-48.png"),
+        os.path.dirname(__file__), "media/microsoft-sql-server-48.png"),
 )
 
 # Register UI schema for form rendering
 ui_schema = {
     "host": {
         "ui:widget": "text",
-        "ui:placeholder": "localhost",
-        "ui:help": "Database server hostname or IP address",
+        "ui:placeholder": "localhost or server.database.windows.net",
+        "ui:help": "Database server hostname or Azure SQL endpoint",
     },
     "port": {
         "ui:widget": "updown",
-        "ui:help": "Database port (leave blank for default)",
+        "ui:help": "Database port (default: 1433)",
     },
     "database": {
         "ui:placeholder": "my_database",
@@ -57,6 +57,18 @@ ui_schema = {
         "ui:widget": "password",
         "ui:help": "Database password (will be stored securely)",
     },
+    "azure_auth": {
+        "ui:widget": "checkbox",
+        "ui:help": "Enable Azure SQL Database authentication",
+    },
+    "encrypt": {
+        "ui:widget": "checkbox",
+        "ui:help": "Use encrypted connection (recommended for Azure SQL)",
+    },
+    "trust_server_certificate": {
+        "ui:widget": "checkbox",
+        "ui:help": "Trust server certificate (for self-signed certificates)",
+    },
     "pool_size": {
         "ui:widget": "updown",
         "ui:help": "Number of persistent connections to maintain",
@@ -68,20 +80,19 @@ ui_schema = {
     "additional_params": {
         "ui:widget": "textarea",
         "ui:options": {"rows": 4},
-        "ui:placeholder": '{"driver": "psycopg2", "ssl": true}',
+        "ui:placeholder": '{"ConnectionTimeout": "30"}',
         "ui:help": "Additional parameters as JSON object (optional)",
     },
 }
 mcp.register_ui_schema(ui_schema)
 
 # Dictionary to store database connections per server
-# Structure: Dict[server_id, DatabaseConnectionManager]
 pool_manager: PoolManager = PoolManager()
 pool_manager.cleanup_loop()
 
 
 @mcp.on_server_create()
-async def on_server_start(server_id: str, server_config: PostgresConfig):
+async def on_server_start(server_id: str, server_config: MSSQLConfig):
     """
     Initialize database connection when MCP server starts.
     This is called once when a server is created with specific configuration.
@@ -89,7 +100,7 @@ async def on_server_start(server_id: str, server_config: PostgresConfig):
     """
     try:
         logger.info(
-            f"Initializing database connection for {server_config.database}"
+            f"Initializing MSSQL connection for {server_config.database}"
         )
         await pool_manager.get_pool(server_id, server_config)
 
@@ -97,7 +108,7 @@ async def on_server_start(server_id: str, server_config: PostgresConfig):
         db_name = server_config.db_name or "default"
 
         logger.info(
-            f"Database connection established successfully "
+            f"MSSQL connection established successfully "
             f"for (db_name: {db_name})"
         )
 
@@ -230,19 +241,17 @@ async def select_query(
         params.sql_query.format(**kwargs) if kwargs else params.sql_query
     )
 
-    # Add LIMIT clause if not already present and limit is specified
+    # Add TOP clause for MSSQL if not already present and limit is specified
     query_upper = formatted_query.upper().strip()
-    if params.limit > 0 and "LIMIT" not in query_upper:
-        # Check if query ends with semicolon
-        if formatted_query.rstrip().endswith(";"):
-            formatted_query = (
-                formatted_query.rstrip()[:-1] +
-                f" LIMIT {params.limit};"
-            )
-        else:
-            formatted_query = (
-                formatted_query.rstrip() + f" LIMIT {params.limit}"
-            )
+    if params.limit > 0 and "TOP" not in query_upper and "SELECT" in query_upper:
+        # Insert TOP after SELECT keyword
+        formatted_query = re.sub(
+            r'(SELECT)\s+',
+            f'\\1 TOP {params.limit} ',
+            formatted_query,
+            count=1,
+            flags=re.IGNORECASE
+        )
 
     results = await pool_manager.execute_query(
         server_id, server_config, formatted_query)
@@ -310,6 +319,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=int(os.getenv("PORT", "8027")),
+        port=int(os.getenv("PORT", "8028")),
         reload=False, workers=int(os.getenv("WORKERS", "1")),
     )
+

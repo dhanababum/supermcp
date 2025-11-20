@@ -9,10 +9,10 @@ from collections.abc import AsyncGenerator
 from src.config import settings
 
 
-logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
-logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
+# logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
+# logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+# logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+# logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
 
 
 async_engine = create_async_engine(

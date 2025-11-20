@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ToolTemplateModal from './ToolTemplateModal';
 import ConfirmationModal from '../../../components/ConfirmationModal';
 import Notification from '../../../components/common/Notification';
+import { API_BASE_URL } from '../../../constants/env';
 
 const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, server }) => {
   const [updatingToolId, setUpdatingToolId] = useState(null);
@@ -45,7 +46,7 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
     setDeletingToolId(toolToDelete.id);
     
     try {
-      const response = await fetch(`http://localhost:9000/api/servers/${serverId}/tools/${toolToDelete.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/servers/${serverId}/tools/${toolToDelete.id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +108,7 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
     );
     
     try {
-      const response = await fetch(`http://localhost:9000/api/servers/${serverId}/tools/${tool.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/servers/${serverId}/tools/${tool.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

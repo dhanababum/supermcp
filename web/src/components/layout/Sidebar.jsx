@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { MenuIcon, InfoIcon, ChevronRightIcon, SuperMCPIcon } from '../icons';
 import { navigationItems } from '../../constants/navigation';
+import { API_BASE_URL } from '../../constants/env';
 
 const Sidebar = ({ collapsed, onToggleCollapse }) => {
   const location = useLocation();
@@ -22,7 +23,7 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
   
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:9000/auth/cookie/logout', {
+      await fetch(`${API_BASE_URL}/auth/cookie/logout`, {
         method: 'POST',
         credentials: 'include',
       });

@@ -138,7 +138,6 @@ async def create_mcp_servers_dictionary(app, mcp: DynamicMCP, mcp_app: Starlette
         )
         online_servers = response.json()
         for key, server in online_servers.items():
-            print(f"********************: {server}")
             app.state.mcp_servers[key] = mcp._connector_config(**server)
             await mcp._execute_create_hooks(
                 server_id=key, server_data=mcp._connector_config(**server)
@@ -200,7 +199,7 @@ def create_dynamic_mcp(
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.app_web_url],
+        allow_origins=settings.origin_urls,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

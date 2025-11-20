@@ -3,11 +3,16 @@
 Script to create a superuser for the MCP Tools platform.
 This script uses the fastapi-users built-in functionality.
 """
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 
 import asyncio
 import uuid
-from database import get_async_session
-from models import User
+from src.database import get_async_session
+from src.models import User
 from fastapi_users.password import PasswordHelper
 from sqlmodel import select
 
@@ -30,7 +35,8 @@ async def create_superuser():
     async for session in get_async_session():
         try:
             # Check if user already exists
-            result = await session.execute(select(User).where(User.email == email))
+            result = await session.execute(select(User).where(
+                User.email == email))
             existing_user = result.scalar_one_or_none()
             if existing_user:
                 print(f"❌ User with email {email} already exists!")

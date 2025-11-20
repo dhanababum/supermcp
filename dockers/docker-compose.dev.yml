@@ -18,7 +18,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - mcp-tools-network
+      - sharednet
   # FastAPI Application
   app:
     build:
@@ -28,9 +28,9 @@ services:
       ASYNC_DATABASE_URL: postgresql+asyncpg://postgres:mysecretpassword@postgres:5432/forge_mcptools
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
       JWT_ALGO: HS256
-      CONNECTOR_SALT: $2b$12$RUWL7I0Nk/n3ohBgomOOO.
-      LOGO_STORAGE_PATH: media/logos
-      APP_STORAGE_PATH: app-storage
+      CONNECTOR_SALT: "$2b$12$$RUWL7I0Nk/n3ohBgomOOO."
+      LOGO_STORAGE_PATH: "media/logos"
+      APP_STORAGE_PATH: "/app/storage"
       LOGO_STORAGE_TYPE: filesystem
       PORT: 9000
       WEB_URL: http://localhost:3001
@@ -50,7 +50,9 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - mcp-tools-network
+      - sharednet
+    extra_hosts:
+      - "localhost:host-gateway"
   
   web:
     build:
@@ -63,7 +65,7 @@ services:
     depends_on:
       - app
     networks:
-      - mcp-tools-network
+      - sharednet
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
       interval: 30s
@@ -75,5 +77,5 @@ volumes:
   postgres_data:
 
 networks:
-  mcp-tools-network:
-    driver: bridge
+  sharednet:
+    external: true

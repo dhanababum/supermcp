@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../services/api';
 
 const ServerTokenSelector = ({ onServerTokenSelect, selectedServer, selectedToken }) => {
   const [servers, setServers] = useState([]);
@@ -9,14 +10,9 @@ const ServerTokenSelector = ({ onServerTokenSelect, selectedServer, selectedToke
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:9000/api/servers/with-tokens');
+      const response = await api.getServersWithTokens();
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      setServers(data || []);
+      setServers(response || []);
     } catch (error) {
       console.error('Error fetching servers:', error);
       setError(`Failed to load servers: ${error.message}`);

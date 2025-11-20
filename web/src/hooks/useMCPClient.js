@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMcp } from 'use-mcp/react';
 
+
 export const useMCPClient = (serverUrl, transportType = 'auto', authToken = null) => {
   // Ensure the URL is properly formatted for MCP
   const normalizedUrl = React.useMemo(() => {
@@ -8,7 +9,8 @@ export const useMCPClient = (serverUrl, transportType = 'auto', authToken = null
       console.warn('Invalid serverUrl provided to useMCPClient:', serverUrl);
       return null;
     }
-    return serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
+    // Ensure URL ends with trailing slash for MCP endpoint to avoid 307 redirects
+    return serverUrl.endsWith('/') ? serverUrl : `${serverUrl}/`;
   }, [serverUrl]);
   
   const debug = false; // Enable debug logging
@@ -57,7 +59,7 @@ export const useMCPClient = (serverUrl, transportType = 'auto', authToken = null
 
   // Always call useMcp with valid options (React hooks must be called unconditionally)
   const mcpResult = useMcp(mcpOptions || {
-    url: 'http://localhost:9000', // Default URL to prevent errors
+    url: serverUrl, // Default URL to prevent errors
     transportType: 'auto',
     debug: false,
     autoRetry: false,
