@@ -106,10 +106,6 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
         // Show success message
         setOneClickStatus({ ...oneClickStatus, [agentName]: 'success' });
         
-        // Show instructions
-        const instructions = getAgentInstructions(agentName);
-        alert(instructions);
-        
         // Reset status after 3 seconds
         setTimeout(() => {
           setOneClickStatus({ ...oneClickStatus, [agentName]: null });
@@ -142,10 +138,6 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
         
         // Show success message
         setOneClickStatus({ ...oneClickStatus, [agentName]: 'success' });
-        
-        // Show instructions
-        const instructions = getAgentInstructions(agentName);
-        alert(instructions);
         
         // Reset status after 3 seconds
         setTimeout(() => {
@@ -205,7 +197,7 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
       iconType: 'component',
       icon: <Cursor.Combine size={56} />,
       description: 'One-click automatic install',
-      color: 'from-purple-500 to-indigo-600'
+      color: 'from-brand-500 to-blue-600'
     },
     {
       id: 'vscode',
@@ -344,7 +336,7 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
         <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
               <span className="ml-3 text-gray-600">Loading configuration...</span>
             </div>
           ) : error ? (
@@ -371,7 +363,7 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
                     onClick={() => setActiveTab('auto')}
                     className={`px-6 py-3 text-sm font-medium transition-colors relative ${
                       activeTab === 'auto'
-                        ? 'text-purple-600 border-b-2 border-purple-600'
+                        ? 'text-brand-600 border-b-2 border-brand-600'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
@@ -384,7 +376,7 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
                     onClick={() => setActiveTab('manual')}
                     className={`px-6 py-3 text-sm font-medium transition-colors relative ${
                       activeTab === 'manual'
-                        ? 'text-purple-600 border-b-2 border-purple-600'
+                        ? 'text-brand-600 border-b-2 border-brand-600'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
@@ -421,7 +413,7 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
                               ? 'border-green-500 bg-green-50'
                               : oneClickStatus[agent.id] === 'error'
                               ? 'border-red-500 bg-red-50'
-                              : 'border-gray-200 bg-white hover:border-purple-300'
+                              : 'border-gray-200 bg-white hover:border-brand-300'
                           }`}
                         >
                           {/* Background Gradient */}
@@ -444,7 +436,7 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
                                 )}
                               </div>
                               {oneClickStatus[agent.id] === 'loading' && (
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-600"></div>
                               )}
                               {oneClickStatus[agent.id] === 'success' && (
                                 <div className="text-green-600">
@@ -462,7 +454,7 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
                               {agent.description}
                             </p>
                             
-                            <div className="flex items-center text-purple-600 font-medium text-sm">
+                            <div className="flex items-center text-brand-600 font-medium text-sm">
                               {oneClickStatus[agent.id] === 'success' ? (
                                 <>
                                   <span>✓ Configuration Copied!</span>
@@ -482,14 +474,14 @@ const ServerConfigModal = ({ server, isOpen, onClose }) => {
                     </div>
 
                     {/* Info Box */}
-                    <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="mt-6 p-4 bg-brand-50 rounded-lg border border-brand-200">
                       <div className="flex items-start">
-                        <svg className="w-5 h-5 text-purple-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-brand-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <div className="text-sm text-purple-800">
+                        <div className="text-sm text-brand-800">
                           <p className="font-medium mb-1">How it works:</p>
-                          <ul className="list-disc list-inside space-y-1 text-purple-700">
+                          <ul className="list-disc list-inside space-y-1 text-brand-700">
                             <li>Click on your preferred agent</li>
                             <li>Configuration will be copied to your clipboard automatically</li>
                             <li>Follow the on-screen instructions to complete the setup</li>

@@ -4,7 +4,7 @@ const OwnershipChart = () => {
   const stakeholders = [
     { name: 'Jon Smith', initials: 'JS', percentage: '68.42%', color: 'bg-blue-500' },
     { name: 'Jane Smith', initials: 'JS', percentage: '10.52%', color: 'bg-blue-400' },
-    { name: 'Unallocated Options', initials: 'UO', percentage: '21.05%', color: 'bg-purple-400' }
+    { name: 'Unallocated Options', initials: 'UO', percentage: '21.05%', color: 'bg-blue-300' }
   ];
 
   return (
@@ -14,7 +14,7 @@ const OwnershipChart = () => {
           <h2 className="text-lg font-semibold text-gray-900">Ownership</h2>
           <p className="text-sm text-gray-500">Equity distribution in your company</p>
         </div>
-        <button className="text-sm text-purple-600 font-medium hover:text-purple-700">
+        <button className="text-sm text-brand-600 font-medium hover:text-brand-700">
           Download cap table
         </button>
       </div>

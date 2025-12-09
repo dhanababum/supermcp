@@ -49,6 +49,7 @@ class CustomToolMiddleware(Middleware):
         return tool
 
     async def on_list_tools(self, context: MiddlewareContext, call_next: CallNext):
+        # print headers
         access_token = get_access_token()
         online_tools: List[AppServerTool] = await self.get_active_tools(
             access_token.token

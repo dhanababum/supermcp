@@ -408,7 +408,7 @@ const MCPClientAdvanced = () => {
                 type="checkbox"
                 checked={getInputValue()}
                 onChange={handleInputChange}
-                className="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                className="w-4 h-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded"
               />
               <span className="ml-2 text-sm text-gray-700">
                 {getInputValue() ? 'True' : 'False'}
@@ -421,7 +421,7 @@ const MCPClientAdvanced = () => {
               onChange={handleInputChange}
               placeholder={prop.description || `Enter ${key}`}
               step={prop.type === 'integer' ? '1' : undefined}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500"
             />
           )}
           
@@ -453,7 +453,7 @@ const MCPClientAdvanced = () => {
                 name="connectionMode"
                 checked={useServerSelection}
                 onChange={() => setUseServerSelection(true)}
-                className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                className="w-4 h-4 text-brand-600 focus:ring-brand-500"
               />
               <span className="ml-2 text-sm font-medium text-gray-700">Select from existing servers</span>
             </label>
@@ -463,7 +463,7 @@ const MCPClientAdvanced = () => {
                 name="connectionMode"
                 checked={!useServerSelection}
                 onChange={() => setUseServerSelection(false)}
-                className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                className="w-4 h-4 text-brand-600 focus:ring-brand-500"
               />
               <span className="ml-2 text-sm font-medium text-gray-700">Manual URL entry</span>
             </label>
@@ -495,7 +495,7 @@ const MCPClientAdvanced = () => {
                     className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center ${
                       copySuccess
                         ? 'bg-green-100 text-green-700 border border-green-300'
-                        : 'bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200'
+                        : 'bg-brand-100 text-brand-700 border border-brand-300 hover:bg-brand-200'
                     }`}
                   >
                     {copySuccess ? (
@@ -530,7 +530,7 @@ const MCPClientAdvanced = () => {
                 id="serverUrl"
                 value={serverUrl}
                 onChange={(e) => setServerUrl(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500"
                 placeholder="http://localhost:8016/mcp"
               />
             </div>
@@ -543,7 +543,7 @@ const MCPClientAdvanced = () => {
                 id="transportType"
                 value={transportType}
                 onChange={(e) => setTransportType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500"
               >
                 <option value="streamable-http">Streamable HTTP</option>
                 <option value="sse">Server-Sent Events (SSE)</option>
@@ -562,7 +562,7 @@ const MCPClientAdvanced = () => {
               id="transportType"
               value={transportType}
               onChange={(e) => setTransportType(e.target.value)}
-              className="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              className="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500"
             >
               <option value="streamable-http">Streamable HTTP</option>
               <option value="sse">Server-Sent Events (SSE)</option>
@@ -582,7 +582,7 @@ const MCPClientAdvanced = () => {
             <button
               onClick={handleConnect}
               disabled={isConnecting || isConnected || (useServerSelection && (!selectedServer || !selectedToken)) || (!useServerSelection && !serverUrl.trim())}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isConnecting ? 'Connecting...' : 'Connect'}
             </button>
@@ -640,8 +640,8 @@ const MCPClientAdvanced = () => {
                   onClick={() => setSelectedTool(tool)}
                   className={`w-full text-left p-3 rounded-lg border transition-colors ${
                     selectedTool?.name === tool.name
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-200 hover:border-purple-200 hover:bg-gray-50'
+                      ? 'border-brand-500 bg-brand-50'
+                      : 'border-gray-200 hover:border-brand-200 hover:bg-gray-50'
                   }`}
                 >
                   <div className="font-medium text-gray-900">{tool.name}</div>
@@ -658,7 +658,7 @@ const MCPClientAdvanced = () => {
               <button
                 onClick={handleCallTool}
                 disabled={!isConnected}
-                className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Call Tool
               </button>
@@ -684,14 +684,14 @@ const MCPClientAdvanced = () => {
                 }`}>
                   <div className={`inline-block max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                     message.type === 'user' 
-                      ? 'bg-purple-600 text-white' 
+                      ? 'bg-brand-600 text-white' 
                       : message.type === 'error'
                       ? 'bg-red-100 text-red-800'
                       : 'bg-white text-gray-800 border'
                   }`}>
                     <div className="text-sm whitespace-pre-wrap">{message.content}</div>
                     <div className={`text-xs mt-1 ${
-                      message.type === 'user' ? 'text-purple-100' : 'text-gray-500'
+                      message.type === 'user' ? 'text-brand-100' : 'text-gray-500'
                     }`}>
                       {message.timestamp.toLocaleTimeString()}
                     </div>
@@ -711,12 +711,12 @@ const MCPClientAdvanced = () => {
               onKeyPress={handleKeyPress}
               placeholder={isConnected ? "Type your message..." : "Connect to a server first"}
               disabled={!isConnected}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
             <button
               onClick={handleSendMessage}
               disabled={!isConnected || !inputMessage.trim()}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Send
             </button>

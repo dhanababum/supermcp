@@ -155,13 +155,13 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
         {/* Modal panel */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-white">
                   Create Tool from Template
                 </h3>
-                <p className="text-purple-100 text-sm mt-1">
+                <p className="text-brand-100 text-sm mt-1">
                   {connector?.name} - Step {step} of 3
                 </p>
               </div>
@@ -181,46 +181,46 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
             <div className="flex items-center">
               <div className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step >= 1 ? 'bg-purple-600 text-white' : 'bg-gray-300 text-gray-600'
+                  step >= 1 ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'
                 }`}>
                   1
                 </div>
                 <span className={`ml-2 text-sm font-medium ${
-                  step >= 1 ? 'text-purple-600' : 'text-gray-500'
+                  step >= 1 ? 'text-brand-600' : 'text-gray-500'
                 }`}>
                   Select Template
                 </span>
               </div>
               <div className="flex-1 h-0.5 bg-gray-300 mx-4">
                 <div className={`h-full transition-all duration-300 ${
-                  step >= 2 ? 'bg-purple-600' : 'bg-gray-300'
+                  step >= 2 ? 'bg-brand-600' : 'bg-gray-300'
                 }`} style={{ width: step >= 2 ? '100%' : '0%' }}></div>
               </div>
               <div className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step >= 2 ? 'bg-purple-600 text-white' : 'bg-gray-300 text-gray-600'
+                  step >= 2 ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'
                 }`}>
                   2
                 </div>
                 <span className={`ml-2 text-sm font-medium ${
-                  step >= 2 ? 'text-purple-600' : 'text-gray-500'
+                  step >= 2 ? 'text-brand-600' : 'text-gray-500'
                 }`}>
                   Configure
                 </span>
               </div>
               <div className="flex-1 h-0.5 bg-gray-300 mx-4">
                 <div className={`h-full transition-all duration-300 ${
-                  step >= 3 ? 'bg-purple-600' : 'bg-gray-300'
+                  step >= 3 ? 'bg-brand-600' : 'bg-gray-300'
                 }`} style={{ width: step >= 3 ? '100%' : '0%' }}></div>
               </div>
               <div className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step >= 3 ? 'bg-purple-600 text-white' : 'bg-gray-300 text-gray-600'
+                  step >= 3 ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'
                 }`}>
                   3
                 </div>
                 <span className={`ml-2 text-sm font-medium ${
-                  step >= 3 ? 'text-purple-600' : 'text-gray-500'
+                  step >= 3 ? 'text-brand-600' : 'text-gray-500'
                 }`}>
                   Review
                 </span>
@@ -233,7 +233,7 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
             {loading && step === 1 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                   <p className="mt-4 text-gray-600">Loading templates...</p>
                 </div>
               </div>
@@ -246,7 +246,7 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
                     <div
                       key={index}
                       onClick={() => handleTemplateSelect(template)}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 cursor-pointer transition-all duration-200"
+                      className="p-4 border border-gray-200 rounded-lg hover:border-brand-300 hover:bg-brand-50 cursor-pointer transition-all duration-200"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -371,7 +371,7 @@ const TemplateToolModal = ({ isOpen, onClose, onSuccess, connector }) => {
                 <button
                   onClick={handleNext}
                   disabled={loading || (step === 2 && !selectedTemplate)}
-                  className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50"
                 >
                   Next
                 </button>

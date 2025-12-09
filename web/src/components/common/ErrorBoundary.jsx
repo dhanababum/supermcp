@@ -55,7 +55,7 @@ class ErrorBoundary extends React.Component {
                   {!isAuthError && (
                     <button
                       onClick={this.handleRetry}
-                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
+                      className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700"
                     >
                       Try Again
                     </button>

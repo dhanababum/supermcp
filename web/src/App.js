@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Sidebar, Banner } from './components/layout';
+import { Sidebar } from './components/layout';
 import { ErrorBoundary } from './components/common';
 import { Dashboard, Connectors, Servers, ServerTools, ServerTokens, MCPClient } from './pages';
 import { Auth } from './pages/Auth';
@@ -26,7 +26,7 @@ const ProtectedRoute = ({ children }) => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -54,9 +54,6 @@ const AppLayout = ({ children }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Banner */}
-        <Banner />
-
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-6">
           {children}

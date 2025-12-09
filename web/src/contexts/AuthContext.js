@@ -58,23 +58,42 @@ export const AuthProvider = ({ children }) => {
 
       const response = await api.login(credentials);
 
-      // Check if login was successful
-      if (response && response.ok) {
+      // Check if login was successful (response might be a Response object or parsed data)
+      // api.login now returns parsed data on error, or Response object on success
+      if (response && (response.ok || response.success)) {
         // Wait for auth status to refresh
         await checkAuthStatus();
         return { success: true };
       }
+      
+      // If we got here, api.login might have thrown, or returned a non-ok response that wasn't caught
+      // But api.js throws on error usually. 
+      // If api.js returns a data object with error info (from the catch block in api.js? no it throws)
+      
+      // If we reached here without throwing, it means success?
+      // api.js throws if !response.ok unless we handled it.
+      // With my change to api.js, it will fall through to error handling if !response.ok.
+      // So if it returns, it must be success (Response object).
+      
+      return { success: true };
 
-      // If response doesn't have 'ok' property, assume success and check auth
-      if (!('ok' in response)) {
-        await checkAuthStatus();
-        return { success: true };
-      }
-
-      // Login failed
-      return { success: false, error: 'Login failed' };
     } catch (error) {
-      return { success: false, error: error?.message ?? 'Network error' };
+       // Use the error message from the API if available
+       let errorMessage = error?.message || 'Login failed';
+       
+       // If the error message is a JSON string (from api.js throwing JSON.stringify(data.detail))
+       try {
+         const parsed = JSON.parse(errorMessage);
+         if (parsed === 'LOGIN_BAD_CREDENTIALS') {
+            errorMessage = 'Invalid email or password';
+         } else if (typeof parsed === 'string') {
+            errorMessage = parsed;
+         }
+       } catch (e) {
+         // Not JSON, keep original
+       }
+
+       return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }

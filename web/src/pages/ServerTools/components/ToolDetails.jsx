@@ -50,7 +50,7 @@ const ToolDetails = ({ tool }) => {
               onClick={() => {
                 navigator.clipboard.writeText(JSON.stringify(tool, null, 2));
               }}
-              className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center space-x-1"
+              className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center space-x-1"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -98,7 +98,7 @@ const ToolDetails = ({ tool }) => {
                       id={paramName}
                       value={toolInputs[paramName] || 'false'}
                       onChange={(e) => setToolInputs({...toolInputs, [paramName]: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     >
                       <option value="true">true</option>
                       <option value="false">false</option>
@@ -110,14 +110,14 @@ const ToolDetails = ({ tool }) => {
                       value={toolInputs[paramName] || paramSchema.default || ''}
                       onChange={(e) => setToolInputs({...toolInputs, [paramName]: e.target.value})}
                       placeholder={paramSchema.default !== undefined ? `Default: ${paramSchema.default}` : `Enter ${paramName}`}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     />
                   ) : paramSchema.enum ? (
                     <select
                       id={paramName}
                       value={toolInputs[paramName] || paramSchema.default || ''}
                       onChange={(e) => setToolInputs({...toolInputs, [paramName]: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     >
                       <option value="">Select {paramName}</option>
                       {paramSchema.enum.map(option => (
@@ -131,7 +131,7 @@ const ToolDetails = ({ tool }) => {
                       value={toolInputs[paramName] || paramSchema.default || ''}
                       onChange={(e) => setToolInputs({...toolInputs, [paramName]: e.target.value})}
                       placeholder={paramSchema.default !== undefined ? `Default: ${paramSchema.default}` : `Enter ${paramName}`}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     />
                   )}
                   

@@ -133,7 +133,7 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
         <button
           onClick={handleManageAccess}
           disabled={loading}
-          className="flex-1 px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors disabled:opacity-50"
+          className="flex-1 px-3 py-1.5 text-sm bg-brand-100 text-brand-700 rounded-md hover:bg-brand-200 transition-colors disabled:opacity-50"
         >
           {loading ? 'Loading...' : 'Manage Access'}
         </button>
@@ -187,7 +187,7 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
                     <h3 className="text-lg font-medium text-gray-900">Users with Access</h3>
                     <button
                       onClick={() => setShowUserSearchModal(true)}
-                      className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                      className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 transition-colors"
                     >
                       Grant Access
                     </button>
@@ -227,7 +227,7 @@ const SuperuserActions = ({ connector, onAccessUpdate }) => {
                   </p>
                   <button
                     onClick={() => setShowUserSearchModal(true)}
-                    className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
+                    className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700"
                   >
                     Grant Access to User
                   </button>

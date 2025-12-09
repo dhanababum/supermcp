@@ -31,6 +31,7 @@ mcp, app = create_dynamic_mcp(
     version="1.0.0",
     logo_file_path=os.path.join(
         os.path.dirname(__file__), "media/postgresql-48.png"),
+    stateless_http=True,
 )
 
 # Register UI schema for form rendering

@@ -108,7 +108,7 @@ const UserSearchModal = ({ isOpen, onClose, onUserSelect, connectorId, existingA
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Type user email to search..."
-                className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,7 +117,7 @@ const UserSearchModal = ({ isOpen, onClose, onUserSelect, connectorId, existingA
               </div>
               {loading && (
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-600"></div>
                 </div>
               )}
             </div>
@@ -148,7 +148,7 @@ const UserSearchModal = ({ isOpen, onClose, onUserSelect, connectorId, existingA
                       onClick={() => handleUserSelect(user)}
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                         selectedUser?.id === user.id
-                          ? 'border-purple-500 bg-purple-50'
+                          ? 'border-brand-500 bg-brand-50'
                           : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -158,7 +158,7 @@ const UserSearchModal = ({ isOpen, onClose, onUserSelect, connectorId, existingA
                           <div className="flex items-center space-x-2 mt-1">
                             <span className={`px-2 py-1 text-xs rounded-full ${
                               user.is_superuser 
-                                ? 'bg-purple-100 text-purple-700' 
+                                ? 'bg-brand-100 text-brand-700' 
                                 : 'bg-blue-100 text-blue-700'
                             }`}>
                               {user.is_superuser ? 'Superuser' : 'User'}
@@ -178,7 +178,7 @@ const UserSearchModal = ({ isOpen, onClose, onUserSelect, connectorId, existingA
                           </div>
                         </div>
                         {selectedUser?.id === user.id && (
-                          <div className="text-purple-600">
+                          <div className="text-brand-600">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
@@ -201,18 +201,18 @@ const UserSearchModal = ({ isOpen, onClose, onUserSelect, connectorId, existingA
 
           {/* Selected User Summary */}
           {selectedUser && (
-            <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <h3 className="text-sm font-medium text-purple-900 mb-2">Selected User</h3>
+            <div className="mb-6 p-4 bg-brand-50 border border-brand-200 rounded-lg">
+              <h3 className="text-sm font-medium text-brand-900 mb-2">Selected User</h3>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-purple-900">{selectedUser.email}</p>
-                  <p className="text-sm text-purple-700">
+                  <p className="font-medium text-brand-900">{selectedUser.email}</p>
+                  <p className="text-sm text-brand-700">
                     {selectedUser.is_superuser ? 'Superuser' : 'Regular User'} • {selectedUser.is_active ? 'Active' : 'Inactive'}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedUser(null)}
-                  className="text-purple-600 hover:text-purple-800"
+                  className="text-brand-600 hover:text-brand-800"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -234,7 +234,7 @@ const UserSearchModal = ({ isOpen, onClose, onUserSelect, connectorId, existingA
           <button
             onClick={handleGrantAccess}
             disabled={!selectedUser}
-            className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Grant Access
           </button>

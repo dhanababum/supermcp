@@ -48,10 +48,8 @@ class DynamicMCP(FastMCP, TemplateMixin):
     def __init__(self, *args, **kwargs):
         if "logo_file_path" in kwargs:
             self._logo_file_path = kwargs.pop("logo_file_path")
-        if not hasattr(self, "_templates"):
-            self._templates = {}
-        if not hasattr(self, "_registry_lock"):
-            self._registry_lock = threading.Lock()
+        self._templates = {}
+        self._registry_lock = threading.Lock()
         super().__init__(*args, **kwargs)
 
     def register_connector_config(self, config: Type[BaseModel]):
@@ -152,13 +150,14 @@ def create_dynamic_mcp(
     config: BaseModel,
     version: str,
     logo_file_path: str,
+    stateless_http: bool = False,
 ):
     assert version is not None, "Version is required"
     assert config is not None, "Config is required"
     assert name is not None, "Name is required"
     assert logo_file_path is not None, "Logo file path is required"
 
-    mcp = DynamicMCP(
+    mcp: FastMCP = DynamicMCP(
         name=name,
         version=version,
         auth=CustomTokenVerifier(base_url=settings.app_base_url),
@@ -169,6 +168,7 @@ def create_dynamic_mcp(
     # Keep the MCP app separate!
     mcp_app = mcp.http_app(
         path="/",
+        stateless_http=stateless_http
     )  # ← Renamed to mcp_app
 
     @mcp.custom_route("/data", methods=["GET"])

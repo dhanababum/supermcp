@@ -78,7 +78,7 @@ const ServerTable = ({ servers, onView, onDelete, onRefresh, onViewTokens }) => 
             <tr key={server.id} className="hover:bg-gray-50">
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                  <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-brand-500 to-blue-500 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
                     </svg>
@@ -120,7 +120,7 @@ const ServerTable = ({ servers, onView, onDelete, onRefresh, onViewTokens }) => 
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white">
                 <button 
                   onClick={() => onView(server)}
-                  className="text-purple-600 hover:text-purple-900 mr-3"
+                  className="text-brand-600 hover:text-brand-900 mr-3"
                 >
                   View
                 </button>

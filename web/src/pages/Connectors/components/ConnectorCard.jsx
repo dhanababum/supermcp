@@ -75,7 +75,7 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
 
       <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
         <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center overflow-hidden">
+        <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-blue-500 rounded-lg flex items-center justify-center overflow-hidden">
           {logoUrl && !logoError ? (
             <img 
               src={logoUrl} 
@@ -179,7 +179,7 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
             // Sync Mode: Show Activate Connector button
             <button 
               onClick={() => onActivate && onActivate(connector)}
-              className="flex-1 px-3 py-2 bg-purple-100 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-200 border border-purple-300 flex items-center justify-center"
+              className="flex-1 px-3 py-2 bg-brand-100 text-brand-700 text-sm font-medium rounded-lg hover:bg-brand-200 border border-brand-300 flex items-center justify-center"
             >
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -190,7 +190,7 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
             // Active Mode: Show Create Server button
             <button 
               onClick={() => onConfigure(connector)}
-              className="flex-1 px-3 py-2 bg-purple-100 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-200 border border-purple-300"
+              className="flex-1 px-3 py-2 bg-brand-100 text-brand-700 text-sm font-medium rounded-lg hover:bg-brand-200 border border-brand-300"
             >
               Create Server
             </button>

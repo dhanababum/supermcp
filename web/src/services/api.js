@@ -46,7 +46,7 @@ const apiRequest = async (endpoint, options = {}) => {
     const response = await fetch(url, fetchOptions);
 
     // Special case: form-encoded login request
-    if (endpoint === API_ROUTES.login && options.isFormEncoded) {
+    if (endpoint === API_ROUTES.login && options.isFormEncoded && response.ok) {
       return response;
     }
 

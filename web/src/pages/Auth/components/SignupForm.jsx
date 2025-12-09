@@ -70,10 +70,10 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-surface-900">
           Create your account
         </h2>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-surface-600">
           Join SuperMCP and start managing your MCP connectors
         </p>
       </div>
@@ -81,7 +81,7 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="email" className="block text-sm font-semibold text-surface-700 mb-2">
               Email address
             </label>
             <input
@@ -91,14 +91,14 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
               autoComplete="email"
               required
               className={`w-full px-4 py-3 border-2 ${
-                (validationErrors.email || fieldErrors.email) ? 'border-red-300 bg-red-50' : 'border-gray-200'
-              } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-200`}
+                (validationErrors.email || fieldErrors.email) ? 'border-error-300 bg-error-50' : 'border-surface-200'
+              } rounded-xl text-surface-900 placeholder-surface-400 focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all duration-200`}
               placeholder="you@example.com"
               value={formData.email}
               onChange={handleChange}
             />
             {(validationErrors.email || fieldErrors.email) && (
-              <p className="mt-2 text-sm text-red-600 flex items-center">
+              <p className="mt-2 text-sm text-error-600 flex items-center">
                 <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -108,7 +108,7 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
           </div>
           
           <div>
-            <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-sm font-semibold text-surface-700 mb-2">
               Password
             </label>
             <input
@@ -118,14 +118,14 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
               autoComplete="new-password"
               required
               className={`w-full px-4 py-3 border-2 ${
-                (validationErrors.password || fieldErrors.password) ? 'border-red-300 bg-red-50' : 'border-gray-200'
-              } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-200`}
+                (validationErrors.password || fieldErrors.password) ? 'border-error-300 bg-error-50' : 'border-surface-200'
+              } rounded-xl text-surface-900 placeholder-surface-400 focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all duration-200`}
               placeholder="Create a strong password"
               value={formData.password}
               onChange={handleChange}
             />
             {(validationErrors.password || fieldErrors.password) && (
-              <p className="mt-2 text-sm text-red-600 flex items-center">
+              <p className="mt-2 text-sm text-error-600 flex items-center">
                 <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -135,7 +135,7 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
           </div>
           
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-semibold text-surface-700 mb-2">
               Confirm Password
             </label>
             <input
@@ -145,14 +145,14 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
               autoComplete="new-password"
               required
               className={`w-full px-4 py-3 border-2 ${
-                (validationErrors.confirmPassword || fieldErrors.confirmPassword) ? 'border-red-300 bg-red-50' : 'border-gray-200'
-              } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-200`}
+                (validationErrors.confirmPassword || fieldErrors.confirmPassword) ? 'border-error-300 bg-error-50' : 'border-surface-200'
+              } rounded-xl text-surface-900 placeholder-surface-400 focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all duration-200`}
               placeholder="Confirm your password"
               value={formData.confirmPassword}
               onChange={handleChange}
             />
             {(validationErrors.confirmPassword || fieldErrors.confirmPassword) && (
-              <p className="mt-2 text-sm text-red-600 flex items-center">
+              <p className="mt-2 text-sm text-error-600 flex items-center">
                 <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -163,12 +163,12 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
         </div>
 
         {error && !Object.values(validationErrors).some(err => err) && !Object.values(fieldErrors).some(err => err) && (
-          <div className="rounded-xl bg-red-50 border-2 border-red-200 p-4">
+          <div className="rounded-xl bg-error-50 border-2 border-error-200 p-4">
             <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-error-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm font-medium text-red-800">
+              <p className="text-sm font-medium text-error-800">
                 {formatError(error)}
               </p>
             </div>
@@ -178,7 +178,7 @@ const SignupForm = ({ onSignup, loading, error, fieldErrors = {}, onClearError }
         <button
           type="submit"
           disabled={loading}
-          className="w-full flex justify-center items-center py-3 px-4 border border-transparent text-base font-semibold rounded-xl text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-4 focus:ring-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+          className="w-full flex justify-center items-center py-3 px-4 border border-transparent text-base font-semibold rounded-xl text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-4 focus:ring-brand-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
         >
           {loading ? (
             <>

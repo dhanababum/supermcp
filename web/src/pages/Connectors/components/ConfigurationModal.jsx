@@ -197,13 +197,13 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
         {/* Modal panel */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-white">
                   Create Server
                 </h3>
-                <p className="text-purple-100 text-sm mt-1">
+                <p className="text-brand-100 text-sm mt-1">
                   Create a new {connector.name} MCP server instance
                 </p>
               </div>
@@ -223,7 +223,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                   <p className="mt-4 text-gray-600">Loading configuration schema...</p>
                 </div>
               </div>
@@ -240,7 +240,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
                     value={serverName}
                     onChange={(e) => setServerName(e.target.value)}
                     placeholder={`e.g., ${connector.name} Production`}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     required
                   />
                   <p className="mt-1 text-xs text-gray-500">
@@ -258,7 +258,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
                     id="tokenExpiresAt"
                     value={tokenExpiresAt}
                     onChange={(e) => setTokenExpiresAt(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     When should the generated token expire? Leave blank for no expiration
@@ -308,7 +308,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
                     form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
                   }
                 }}
-                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
+                className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700"
               >
                 Create Server
               </button>
@@ -374,7 +374,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
                     </code>
                     <button
                       onClick={handleCopyToken}
-                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                      className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 flex items-center space-x-2"
                       title="Copy token"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,7 +389,7 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
               <div className="flex justify-end">
                 <button
                   onClick={handleCloseTokenModal}
-                  className="px-6 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700"
+                  className="px-6 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700"
                 >
                   Done
                 </button>

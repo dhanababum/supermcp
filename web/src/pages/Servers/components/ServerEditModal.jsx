@@ -160,13 +160,13 @@ const ServerEditModal = ({ server, isOpen, onClose, onSuccess }) => {
         {/* Modal panel */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-white">
                   Edit Server Configuration
                 </h3>
-                <p className="text-purple-100 text-sm mt-1">
+                <p className="text-brand-100 text-sm mt-1">
                   Update configuration for {server.server_name}
                 </p>
               </div>
@@ -186,7 +186,7 @@ const ServerEditModal = ({ server, isOpen, onClose, onSuccess }) => {
             {loading && !schema ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                   <p className="mt-4 text-gray-600">Loading server configuration...</p>
                 </div>
               </div>
@@ -236,7 +236,7 @@ const ServerEditModal = ({ server, isOpen, onClose, onSuccess }) => {
                     form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
                   }
                 }}
-                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading}
               >
                 {loading ? 'Updating...' : 'Update Configuration'}

@@ -182,7 +182,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
         <div className="p-8">
           <div className="flex justify-between items-center mb-8 pb-6 border-b border-gray-100">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-brand-500 to-blue-500 rounded-xl flex items-center justify-center">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -212,7 +212,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
               </div>
               {loading ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto"></div>
                   <p className="mt-2 text-gray-600">Loading templates...</p>
                 </div>
               ) : error ? (
@@ -220,7 +220,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                   <p className="text-red-600">{error}</p>
                   <button
                     onClick={fetchTemplates}
-                    className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    className="mt-4 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700"
                   >
                     Retry
                   </button>
@@ -239,7 +239,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                               handleTemplateSelect(selectedTemplate);
                             }
                           }}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-200 bg-white hover:border-gray-300"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all duration-200 bg-white hover:border-gray-300"
                           defaultValue=""
                         >
                           <option value="" disabled>Select a template...</option>
@@ -257,7 +257,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                         </div>
                       </div>
                       {selectedTemplate && (
-                        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-blue-50 border border-blue-200 rounded-xl">
                           <div className="flex items-start space-x-3">
                             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,7 +290,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                 <div className="flex items-center space-x-4 text-sm text-gray-600">
                   <div className="flex items-center space-x-2">
                     <span className="font-medium">Template:</span>
-                    <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium">
+                    <span className="px-2 py-1 bg-brand-100 text-brand-700 rounded-lg text-xs font-medium">
                       {selectedTemplate.name}
                     </span>
                   </div>
@@ -362,7 +362,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                         </div>
                         
                         {/* Template String Input */}
-                        <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                        <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-blue-50 border border-blue-200 rounded-xl">
                           <h5 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                             <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -585,7 +585,7 @@ const ToolTemplateModal = ({ isOpen, onClose, onSuccess, server }) => {
                 <button
                   onClick={handleNext}
                   disabled={loading || (step === 1 && !selectedTemplate)}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold rounded-xl hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl"
+                  className="px-6 py-3 bg-gradient-to-r from-brand-600 to-brand-700 text-white text-sm font-semibold rounded-xl hover:from-brand-700 hover:to-brand-800 disabled:opacity-50 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl"
                 >
                   <span>Next</span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

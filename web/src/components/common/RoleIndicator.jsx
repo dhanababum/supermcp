@@ -7,15 +7,15 @@ const RoleIndicator = () => {
   if (!user) return null;
 
   return (
-    <div className="flex items-center space-x-2">
-      <div className={`px-2 py-1 text-xs font-medium rounded-full ${
+    <div className="flex items-center space-x-3 pl-4 border-l border-surface-200">
+      <div className={`px-2.5 py-0.5 text-xs font-semibold rounded-full tracking-wide ${
         isSuperuser() 
-          ? 'bg-purple-100 text-purple-700' 
-          : 'bg-blue-100 text-blue-700'
+          ? 'bg-brand-100 text-brand-700 border border-brand-200' 
+          : 'bg-surface-100 text-surface-700 border border-surface-200'
       }`}>
-        {isSuperuser() ? 'Superuser' : 'User'}
+        {isSuperuser() ? 'SUPERUSER' : 'USER'}
       </div>
-      <span className="text-sm text-gray-600">{user.email}</span>
+      <span className="text-sm font-medium text-surface-600">{user.email}</span>
     </div>
   );
 };

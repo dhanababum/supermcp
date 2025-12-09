@@ -162,7 +162,7 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
           <h2 className="text-lg font-semibold text-gray-900">Available Tools</h2>
         <button
           onClick={handleCreateTool}
-          className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+          className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 flex items-center space-x-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -176,8 +176,8 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
             key={index}
             className={`relative p-4 rounded-lg border-2 transition-colors ${
               selectedTool?.name === tool.name
-                ? 'border-purple-500 bg-purple-50'
-                : 'border-gray-200 hover:border-purple-200 hover:bg-gray-50'
+                ? 'border-brand-500 bg-brand-50'
+                : 'border-gray-200 hover:border-brand-200 hover:bg-gray-50'
             } ${!tool.is_active ? 'opacity-60' : ''}`}
           >
             {/* Top row with radio button and delete button */}
@@ -188,10 +188,10 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
                   name="tool-selection"
                   checked={selectedTool?.name === tool.name}
                   onChange={() => onSelectTool(tool)}
-                  className="w-4 h-4 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                  className="w-4 h-4 text-brand-600 focus:ring-brand-500 cursor-pointer"
                 />
                 <span className={`text-sm font-semibold ${
-                  selectedTool?.name === tool.name ? 'text-purple-900' : 'text-gray-900'
+                  selectedTool?.name === tool.name ? 'text-brand-900' : 'text-gray-900'
                 }`}>
                   {tool.name}
                 </span>
@@ -228,7 +228,7 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
                   <button
                     onClick={(e) => handleToggleActive(tool, e)}
                     disabled={updatingToolId === tool.id}
-                    className={`w-full h-full inline-flex items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                    className={`w-full h-full inline-flex items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
                       updatingToolId === tool.id
                         ? 'opacity-50 cursor-not-allowed'
                         : 'cursor-pointer'
@@ -266,7 +266,7 @@ const ToolsList = ({ tools, selectedTool, onSelectTool, serverId, onToolUpdate, 
             {/* Tool description below */}
             {tool.description && (
               <p className={`text-xs ${
-                selectedTool?.name === tool.name ? 'text-purple-700' : 'text-gray-600'
+                selectedTool?.name === tool.name ? 'text-brand-700' : 'text-gray-600'
               } line-clamp-2`}>
                 {tool.description}
               </p>
