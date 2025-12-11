@@ -1,0 +1,36 @@
+[project]
+name = "tenants-sqldb-connector"
+version = "1.0.0"
+description = "Multi-tenant SQL Database MCP Connector with support for multiple database types"
+requires-python = ">=3.12.2"
+dependencies = [
+    "sqlalchemy>=2.0.0",
+    "mcp-pkg",
+    "pydantic>=2.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "psycopg2-binary>=2.9.11",
+    "pymysql>=1.1.2",
+    "snowflake-sqlalchemy>=1.7.7",
+    "databricks-sqlalchemy>=2.0.8",
+    "asyncpg>=0.30.0",
+    "greenlet>=3.2.4",
+    "aiomysql>=0.3.2",
+]
+
+[project.optional-dependencies]
+postgresql = ["psycopg2-binary>=2.9.0"]
+mysql = ["pymysql>=1.1.0"]
+mssql = ["pyodbc>=5.0.0"]
+oracle = ["cx_oracle>=8.3.0"]
+snowflake = ["snowflake-sqlalchemy>=1.5.0"]
+all = [
+    "psycopg2-binary>=2.9.0",
+    "pymysql>=1.1.0",
+    "pyodbc>=5.0.0",
+    "cx_oracle>=8.3.0",
+    "snowflake-sqlalchemy>=1.5.0",
+]
+
+[tool.uv.sources]
+mcp-pkg = { path = "../../mcp_pkg", editable = true }

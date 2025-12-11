@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # Tenants SQL Database Connector
+  tenants-sqldb-connector:
+    build:
+      context: ..
+      dockerfile: connectors/tenants_sqldb/Dockerfile.dev
+    environment:
+      CONNECTOR_ID: 0c8e27c6-cb0e-466c-9c7b-b1b320cdbd9a
+      CONNECTOR_SECRET: 38b27cb3d71a46d4820a65a4cd8a0122
+      APP_BASE_URL: http://app:9000
+      ORIGIN_URLS: '["http://web:3000", "http://localhost:3001"]'
+      WORKERS: 3
+      PORT: 8026
+    ports:
+      - "8026:8026"
+    volumes:
+      # Mount mcp_pkg for hot reload during development
+      - ../mcp_pkg:/app/mcp_pkg
+      # Mount connector code for hot reload
+      - ../connectors/tenants_sqldb:/app
+    networks:
+      - sharednet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8026/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+  
+  # PostgreSQL Database Connector
+  postgres-connector:
+    build:
+      context: ..
+      dockerfile: connectors/postgres/Dockerfile.dev
+    environment:
+      CONNECTOR_ID: 8bb84784-4eee-42d0-bd8c-14bac5c6f559
+      CONNECTOR_SECRET: 9c9a1ba64b954d23a4e3c56cdbcfd932
+      APP_BASE_URL: http://app:9000
+      ORIGIN_URLS: '["http://web:3000", "http://localhost:3001"]'
+      PORT: 8027
+      WORKERS: 3
+    ports:
+      - "8027:8027"
+    volumes:
+      - ../mcp_pkg:/app/mcp_pkg
+      - ../connectors/postgres:/app
+    networks:
+      - sharednet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8027/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+  # MSSQL Database Connector
+  mssql-connector:
+    build:
+      context: ..
+      dockerfile: connectors/mssql/Dockerfile.dev
+    environment:
+      CONNECTOR_ID: 36558f75-8d9e-44de-b30a-26f94aeca6cd
+      CONNECTOR_SECRET: 93686ece9515401e9b5b3518f043caf6
+      APP_BASE_URL: http://app:9000
+      ORIGIN_URLS: '["http://web:3000", "http://localhost:3001"]'
+      PORT: 8028
+      WORKERS: 1
+    ports:
+      - "8028:8028"
+    volumes:
+      - ../mcp_pkg:/app/mcp_pkg
+      - ../connectors/mssql:/app
+    networks:
+      - sharednet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8028/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  sharednet:
+    external: true

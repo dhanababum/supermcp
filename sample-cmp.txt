@@ -1,0 +1,6 @@
+Attaching to postgres-connector-1
+postgres-connector-1  | Checking API connectivity...
+postgres-connector-1  | API returned status code: 404
+postgres-connector-1  | API is reachable
+postgres-connector-1  | [Route(path='/connector.json', name='get_tools', methods=['GET', 'HEAD']), Route(path='/logo.png', name='get_logo', methods=['GET', 'HEAD']), Route(path='/create-server/{server_id}', name='create_new_mcp_server', methods=['POST']), Route(path='/destroy-server/{server_id}', name='destroy_mcp_server', methods=['POST'])]
+postgres-connector-1 exited with code 3

@@ -1,0 +1,17 @@
+[project]
+name = "mcp-pkg"
+version = "0.1.0"
+description = "MCP Package for dynamic MCP server creation"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=2.0.0",
+    "httpx>=0.27.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+

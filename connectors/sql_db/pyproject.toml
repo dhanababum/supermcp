@@ -1,0 +1,26 @@
+[project]
+name = "mcp-tools"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12.2"
+dependencies = [
+    "aiosqlite>=0.21.0",
+    "bcrypt>=5.0.0",
+    "black>=25.9.0",
+    "dynamic-fastmcp>=0.1.0",
+    "fastapi>=0.118.0",
+    "fastapi-mcp>=0.4.0",
+    "fastmcp>=2.12.4",
+    "ipdb>=0.13.13",
+    "mcp-pkg",
+    "mcp[cli]>=1.15.0",
+    "pyjwt>=2.10.1",
+    "sqlalchemy[asyncio]>=2.0.43",
+]
+
+[tool.uv.sources]
+mcp-pkg = { path = "../../mcp_pkg", editable = true }
+
+[tool.hatch.metadata]
+allow-direct-references = true

@@ -1,0 +1,66 @@
+# Development Dockerfile with hot reload support
+# 
+# Build from workspace root:
+#   docker build -f connectors/tenants_sqldb/Dockerfile.dev -t tenants-sqldb:dev .
+#
+# Or use docker-compose with proper build context
+
+FROM python:3.12.2-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Set initial work directory
+WORKDIR /workspace
+
+# Install system dependencies
+# Includes database driver dependencies for PostgreSQL, MySQL, MSSQL
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gettext-base \
+    libpq-dev \
+    default-libmysqlclient-dev \
+    unixodbc-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for faster dependency management
+RUN pip install uv
+
+# Copy mcp_pkg to the expected location (two levels up from connector)
+# This requires building from workspace root context
+COPY mcp_pkg /workspace/mcp_pkg
+
+# Create the connector directory structure
+RUN mkdir -p /workspace/connectors/postgres
+
+# Copy dependency files to maintain relative path structure
+COPY connectors/postgres/pyproject.toml connectors/postgres/uv.lock /workspace/connectors/postgres/
+
+# Change to connector directory for uv sync
+WORKDIR /workspace/connectors/postgres
+
+# Install Python dependencies using uv
+RUN uv sync --frozen
+
+# Copy application code to the workspace structure
+COPY connectors/postgres/ /workspace/connectors/postgres/
+
+# Set proper permissions for entrypoint script
+RUN chmod +x /workspace/connectors/postgres/entrypoint.sh
+
+# Set work directory to the connector directory
+WORKDIR /workspace/connectors/postgres
+
+# Update PATH to include the venv from the workspace location
+ENV PATH="/workspace/connectors/postgres/.venv/bin:$PATH" \
+    PYTHONPATH="/workspace/connectors/postgres"
+
+# Expose port (connector runs on 8027)
+EXPOSE 8027
+
+# Default command with reload enabled for development
+CMD ["sh", "entrypoint.sh"]

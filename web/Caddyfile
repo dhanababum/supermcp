@@ -1,0 +1,38 @@
+{
+    # Global options
+    admin off
+    # Disable automatic HTTPS for local development
+    auto_https off
+}
+
+:80 {
+    # Serve static files from /usr/share/caddy
+    root * /usr/share/caddy
+    
+    # Enable compression
+    encode gzip
+    
+    # Add security headers
+    header {
+        # Enable XSS protection
+        X-XSS-Protection "1; mode=block"
+        # Prevent content type sniffing
+        X-Content-Type-Options "nosniff"
+        # Enable frame protection
+        X-Frame-Options "DENY"
+        # Remove server header
+        -Server
+    }
+    
+    # Serve static files
+    file_server
+    
+    # SPA fallback - serve index.html for all routes that don't match files
+    try_files {path} /index.html
+    
+    # Log access
+    log {
+        output stdout
+        format console
+    }
+}

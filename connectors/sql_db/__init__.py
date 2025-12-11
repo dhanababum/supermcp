@@ -1,0 +1,14 @@
+import sys
+sys.path.append("/Users/dhanababu/workspace/forge-mcptools/mcp_pkg")
+print(sys.path)
+__connector_name__ = "SQL databases"
+__connector_description__ = "Connect to SQL databases"
+__connector_version__ = "0.1.0"
+__connector_author__ = "MCP Tools"
+__connector_author_email__ = "mcp-tools@example.com"
+__connector_author_url__ = "https://mcp-tools.example.com"
+__connector_license__ = "MIT"
+__connector_license_url__ = "https://opensource.org/licenses/MIT"
+__connector_keywords__ = ["SQL", "database", "connector"]
+__connector_tags__ = ["SQL", "database", "connector"]
+__connector_categories__ = ["database"]

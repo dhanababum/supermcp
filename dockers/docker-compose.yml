@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: forge_mcptools
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Application
+  app:
+    build:
+      context: ../app
+      dockerfile: Dockerfile
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://postgres:mysecretpassword@postgres:5432/forge_mcptools
+      
+      # JWT configuration
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      
+      # Connector salt
+      CONNECTOR_SALT: $2b$12$RUWL7I0Nk/n3ohBgomOOO.
+      
+      # Logo storage
+      LOGO_STORAGE_PATH: media/logos
+      LOGO_STORAGE_TYPE: filesystem
+    ports:
+      - "9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../app/media:/app/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:

@@ -1,0 +1,23 @@
+[project]
+name = "api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12.2"
+dependencies = [
+    "alembic>=1.16.5",
+    "asyncpg>=0.30.0",
+    "bcrypt>=4.3.0",
+    "fastapi>=0.118.0",
+    "fastapi-mcp>=0.4.0",
+    "fastapi-users>=14.0.1",
+    "fastapi-users-db-sqlalchemy>=7.0.0",
+    "fastapi-users-db-sqlmodel>=0.3.0",
+    "pillow>=11.3.0",
+    "psycopg2-binary>=2.9.10",
+    "python-dateutil>=2.9.0.post0",
+    "python-multipart>=0.0.20",
+    "requests>=2.32.5",
+    "sqlmodel>=0.0.25",
+    "uvicorn>=0.37.0",
+]

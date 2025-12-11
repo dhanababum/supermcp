@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: forge_mcptools
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sharednet
+  # FastAPI Application
+  app:
+    build:
+      context: ../app
+      dockerfile: Dockerfile.dev
+    environment:
+      ASYNC_DATABASE_URL: postgresql+asyncpg://postgres:mysecretpassword@postgres:5432/forge_mcptools
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_ALGO: HS256
+      CONNECTOR_SALT: "$2b$12$$RUWL7I0Nk/n3ohBgomOOO."
+      LOGO_STORAGE_PATH: "media/logos"
+      APP_STORAGE_PATH: "/app/storage"
+      LOGO_STORAGE_TYPE: filesystem
+      PORT: 9000
+      WEB_URL: http://localhost:3001
+      SUPERUSER_EMAIL: super@test.com
+      SUPERUSER_PASSWORD: Test123
+    ports:
+      - "9001:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../app/storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sharednet
+    extra_hosts:
+      - "localhost:host-gateway"
+  
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile.dev
+    environment:
+      API_BASE_URL: http://localhost:9001  # Point to the app service
+    ports:
+      - "3001:80"
+    depends_on:
+      - app
+    networks:
+      - sharednet
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+
+networks:
+  sharednet:
+    external: true
