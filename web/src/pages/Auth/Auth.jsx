@@ -140,11 +140,6 @@ const Auth = () => {
       {/* Right side - Auth Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white shadow-soft">
         <div className="w-full max-w-md space-y-8">
-          {/* Logo */}
-          <div className="flex justify-center mb-6">
-            <SuperMCPLightIcon className="h-12" />
-          </div>
-
           <div className="text-center">
             <h2 className="text-2xl font-bold text-surface-900">
               {isLogin ? 'Welcome back' : 'Create an account'}
