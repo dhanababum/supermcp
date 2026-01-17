@@ -61,5 +61,55 @@ const SuperMCPIcon = ({ className = "w-8 h-8", ...props }) => {
   );
 };
 
-export default SuperMCPIcon;
+const SuperMCPDarkIcon = ({ className = "w-8 h-8", ...props }) => {
+  return (
+    <svg 
+      className={className}
+      xmlns="http://www.w3.org/2000/svg" 
+      width="177" 
+      height="24" 
+      viewBox="0 0 177 24" 
+      fill="none"
+      {...props}
+    >
+      <circle cx="8" cy="12" r="2.5" fill="#22C55E"/>
+      <circle cx="19" cy="7" r="2.5" fill="#22C55E"/>
+      <circle cx="19" cy="17" r="2.5" fill="#22C55E"/>
+      <line x1="8" y1="12" x2="19" y2="7" stroke="#22C55E" strokeWidth="1.5"/>
+      <line x1="8" y1="12" x2="19" y2="17" stroke="#22C55E" strokeWidth="1.5"/>
+      <path d="M 10.5 12 Q 13.5 12 16.5 7" stroke="#22C55E" strokeWidth="1.5" fill="none"/>
+      <path d="M 10.5 12 Q 13.5 12 16.5 17" stroke="#22C55E" strokeWidth="1.5" fill="none"/>
+      <text x="26" y="17" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="700" fill="#F9FAFB">
+        Super<tspan fill="#22C55E">MCP</tspan>
+      </text>
+    </svg> 
+  );
+};
+
+const SuperMCPLightIcon = ({ className = "w-8 h-8", ...props }) => {
+  return (
+    <svg 
+      className={className}
+      xmlns="http://www.w3.org/2000/svg" 
+      width="177" 
+      height="24" 
+      viewBox="0 0 177 24" 
+      fill="none"
+      {...props}
+    >
+      <circle cx="8" cy="12" r="2.5" fill="#4CA154"/>
+      <circle cx="19" cy="7" r="2.5" fill="#4CA154"/>
+      <circle cx="19" cy="17" r="2.5" fill="#4CA154"/>
+      <line x1="8" y1="12" x2="19" y2="7" stroke="#4CA154" strokeWidth="1.5"/>
+      <line x1="8" y1="12" x2="19" y2="17" stroke="#4CA154" strokeWidth="1.5"/>
+      <path d="M 10.5 12 Q 13.5 12 16.5 7" stroke="#4CA154" strokeWidth="1.5" fill="none"/>
+      <path d="M 10.5 12 Q 13.5 12 16.5 17" stroke="#4CA154" strokeWidth="1.5" fill="none"/>
+      <text x="26" y="17" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="700" fill="#1F2937">
+        Super<tspan fill="#4CA154">MCP</tspan>
+      </text>
+    </svg>  
+  );
+};
+
+export { SuperMCPIcon, SuperMCPDarkIcon, SuperMCPLightIcon };
 

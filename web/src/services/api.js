@@ -280,5 +280,21 @@ export const api = {
   getServersWithTokens: async () => {
     return apiRequest(API_ROUTES.serversWithTokens);
   },
+
+  // Server Metrics (Observability)
+  getServerMetrics: async (serverId, interval = '1min', hours = 1) => {
+    return apiRequest(`/api/servers/${serverId}/metrics?interval=${interval}&hours=${hours}`);
+  },
+
+  getServerMetricsSummary: async (serverId, hours = 24) => {
+    return apiRequest(`/api/servers/${serverId}/metrics/summary?hours=${hours}`);
+  },
+
+  getServerLogs: async (serverId, { limit = 50, offset = 0, tool_name, status } = {}) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    if (tool_name) params.append('tool_name', tool_name);
+    if (status) params.append('status', status);
+    return apiRequest(`/api/servers/${serverId}/logs?${params}`);
+  },
 };
 

@@ -11,11 +11,12 @@ from datetime import datetime, timedelta, timezone
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func
+from sqlalchemy import func, text
+from sqlalchemy.orm import selectinload
 from starlette.responses import FileResponse
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from src.config import settings
 from src.database import get_async_session
@@ -45,6 +46,7 @@ from src.models import (
     McpServer,
     McpServerToken,
     McpServerTool,
+    McpToolCallLog,
     User,
     ConnectorAccess,
 )
@@ -68,10 +70,8 @@ async def get_auth_token(
     )
     server_token = await session.execute(token_statement)
     server_token: McpServerToken = server_token.scalars().first()
-    print(f"Token: {type(server_token)}")
     if not server_token:
         raise HTTPException(status_code=401, detail="Invalid token")
-    print("..........")
     return server_token
 
 
@@ -1021,6 +1021,7 @@ async def list_all_servers(
     """
     statement = (
         select(McpServer)
+        .options(selectinload(McpServer.connector), selectinload(McpServer.server_tools))
         .where(
             McpServer.is_active.is_(True),
             McpServer.user_id == current_user.id)
@@ -1029,19 +1030,27 @@ async def list_all_servers(
     result = await session.execute(statement)
     configs = result.scalars().all()
 
-    return [
-        {
+    servers_list = []
+    for config in configs:
+        connector = await config.awaitable_attrs.connector
+        server_tools = await config.awaitable_attrs.server_tools
+        active_tools = [t for t in server_tools if t.is_active]
+        static_count = sum(1 for t in active_tools if t.tool_type == ToolType.static)
+        dynamic_count = sum(1 for t in active_tools if t.tool_type == ToolType.dynamic)
+        servers_list.append({
             "id": config.id,
             "connector_id": config.connector_id,
+            "connector_logo_name": connector.logo_name if connector else None,
             "server_name": config.server_name,
             "server_url": config.server_url,
             "configuration": config.configuration,
             "created_at": config.created_at.isoformat(),
             "updated_at": config.updated_at.isoformat(),
             "is_active": config.is_active,
-        }
-        for config in configs
-    ]
+            "static_tools_count": static_count,
+            "dynamic_tools_count": dynamic_count,
+        })
+    return servers_list
 
 
 @router.get("/servers/with-tokens")
@@ -1872,6 +1881,247 @@ async def get_tool_by_name(
         "tool": tool.tool,
     }
     return tool_data
+
+
+# ============================================================================
+# Observability Endpoints - Tool Call Logs & Metrics
+# ============================================================================
+
+@router.post("/logs")
+async def create_tool_call_log(
+    log_data: dict,
+    session: AsyncSession = Depends(get_async_session),
+    token: McpServerToken = Depends(get_auth_token),
+) -> dict:
+    """Insert tool call log (called by ObservabilityMiddleware)."""
+    log = McpToolCallLog(
+        server_id=token.mcp_server_id,
+        user_id=token.user_id,
+        called_at=datetime.now(timezone.utc),
+        tool_name=log_data.get("tool_name", "unknown"),
+        tool_type=log_data.get("tool_type", "static"),
+        arguments=log_data.get("arguments"),
+        result_summary=log_data.get("result_summary"),
+        status=log_data.get("status", "unknown"),
+        error_message=log_data.get("error_message"),
+        duration_ms=log_data.get("duration_ms", 0),
+    )
+    session.add(log)
+    await session.commit()
+    return {"status": "logged"}
+
+
+@router.get("/servers/{server_id}/logs")
+async def get_tool_call_logs(
+    server_id: uuid.UUID,
+    limit: int = Query(default=100, le=1000),
+    offset: int = Query(default=0, ge=0),
+    tool_name: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> List[dict]:
+    """Get recent tool call logs from TimescaleDB hypertable."""
+    server = await session.execute(
+        select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.user_id == current_user.id,
+            McpServer.is_active.is_(True),
+        )
+    )
+    server = server.scalars().first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    try:
+        conditions = ["server_id = :server_id"]
+        params = {"server_id": server_id, "limit": limit, "offset": offset}
+        
+        if tool_name:
+            conditions.append("tool_name = :tool_name")
+            params["tool_name"] = tool_name
+        if status:
+            conditions.append("status = :status")
+            params["status"] = status
+        
+        where_clause = " AND ".join(conditions)
+        query = text(f"""
+            SELECT 
+                id,
+                called_at,
+                server_id::text,
+                user_id::text,
+                tool_name,
+                tool_type,
+                arguments,
+                result_summary,
+                status,
+                error_message,
+                duration_ms
+            FROM mcp_tool_call_logs 
+            WHERE {where_clause}
+            ORDER BY called_at DESC
+            LIMIT :limit OFFSET :offset
+        """)
+        result = await session.execute(query, params)
+        rows = result.mappings().all()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        return []
+
+
+@router.get("/servers/{server_id}/metrics")
+async def get_server_metrics(
+    server_id: uuid.UUID,
+    interval: str = Query(default="1min", regex="^(1min|1hr|1day)$"),
+    hours: int = Query(default=1, ge=1, le=168),
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> List[dict]:
+    """Get metrics from TimescaleDB continuous aggregates."""
+    server = await session.execute(
+        select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.user_id == current_user.id,
+            McpServer.is_active.is_(True),
+        )
+    )
+    server = server.scalars().first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    view_map = {
+        "1min": "tool_metrics_1min",
+        "1hr": "tool_metrics_1hr",
+        "1day": "tool_metrics_1day",
+    }
+    view = view_map.get(interval, "tool_metrics_1min")
+
+    try:
+        query = text(f"""
+            SELECT 
+                bucket,
+                server_id::text,
+                tool_name,
+                call_count,
+                error_count,
+                avg_duration_ms,
+                max_duration_ms,
+                min_duration_ms
+            FROM {view}
+            WHERE server_id = :server_id
+            AND bucket >= NOW() - INTERVAL '{hours} hours'
+            ORDER BY bucket DESC, tool_name
+        """)
+        result = await session.execute(query, {"server_id": server_id})
+        rows = result.mappings().all()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
+
+
+@router.get("/servers/{server_id}/metrics/summary")
+async def get_server_metrics_summary(
+    server_id: uuid.UUID,
+    hours: int = Query(default=24, ge=1, le=720),
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> dict:
+    """Get aggregated metrics summary for dashboard."""
+    server = await session.execute(
+        select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.user_id == current_user.id,
+            McpServer.is_active.is_(True),
+        )
+    )
+    server = server.scalars().first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    tools = []
+    totals = {}
+    
+    # Try continuous aggregate first
+    try:
+        query = text(f"""
+            SELECT
+                tool_name,
+                SUM(call_count)::bigint AS total_calls,
+                SUM(error_count)::bigint AS total_errors,
+                AVG(avg_duration_ms)::integer AS avg_duration_ms,
+                MAX(max_duration_ms) AS max_duration_ms,
+                MIN(min_duration_ms) AS min_duration_ms
+            FROM tool_metrics_1hr
+            WHERE server_id = :server_id
+            AND bucket >= NOW() - INTERVAL '{hours} hours'
+            GROUP BY tool_name
+            ORDER BY total_calls DESC
+        """)
+        result = await session.execute(query, {"server_id": server_id})
+        tools = [dict(row) for row in result.mappings().all()]
+
+        totals_query = text(f"""
+            SELECT
+                SUM(call_count)::bigint AS total_calls,
+                SUM(error_count)::bigint AS total_errors,
+                AVG(avg_duration_ms)::integer AS avg_duration_ms
+            FROM tool_metrics_1hr
+            WHERE server_id = :server_id
+            AND bucket >= NOW() - INTERVAL '{hours} hours'
+        """)
+        totals_result = await session.execute(totals_query, {"server_id": server_id})
+        totals = dict(totals_result.mappings().first() or {})
+    except Exception:
+        pass
+
+    # Fallback to raw logs if aggregate is empty
+    if not tools:
+        try:
+            raw_query = text(f"""
+                SELECT
+                    tool_name,
+                    COUNT(*)::bigint AS total_calls,
+                    COUNT(*) FILTER (WHERE status = 'error')::bigint AS total_errors,
+                    AVG(duration_ms)::integer AS avg_duration_ms,
+                    MAX(duration_ms) AS max_duration_ms,
+                    MIN(duration_ms) AS min_duration_ms
+                FROM mcp_tool_call_logs
+                WHERE server_id = :server_id
+                AND called_at >= NOW() - INTERVAL '{hours} hours'
+                GROUP BY tool_name
+                ORDER BY total_calls DESC
+            """)
+            result = await session.execute(raw_query, {"server_id": server_id})
+            tools = [dict(row) for row in result.mappings().all()]
+
+            raw_totals_query = text(f"""
+                SELECT
+                    COUNT(*)::bigint AS total_calls,
+                    COUNT(*) FILTER (WHERE status = 'error')::bigint AS total_errors,
+                    AVG(duration_ms)::integer AS avg_duration_ms
+                FROM mcp_tool_call_logs
+                WHERE server_id = :server_id
+                AND called_at >= NOW() - INTERVAL '{hours} hours'
+            """)
+            totals_result = await session.execute(raw_totals_query, {"server_id": server_id})
+            totals = dict(totals_result.mappings().first() or {})
+        except Exception:
+            pass
+
+    return {
+        "server_id": str(server_id),
+        "period_hours": hours,
+        "totals": {
+            "total_calls": totals.get("total_calls") or 0,
+            "total_errors": totals.get("total_errors") or 0,
+            "avg_duration_ms": totals.get("avg_duration_ms") or 0,
+            "error_rate": round(
+                (totals.get("total_errors") or 0) / (totals.get("total_calls") or 1) * 100, 2
+            ),
+        },
+        "by_tool": tools,
+    }
 
 
 app.include_router(router)

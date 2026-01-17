@@ -1,13 +1,14 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # TimescaleDB Database (PostgreSQL with time-series extensions)
   postgres:
-    image: postgres:15-alpine
+    image: timescale/timescaledb:latest-pg15
     environment:
       POSTGRES_DB: forge_mcptools
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: mysecretpassword
+    command: postgres -c shared_preload_libraries=timescaledb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

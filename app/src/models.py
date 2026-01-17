@@ -1,8 +1,8 @@
 import uuid
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from sqlalchemy import Column, ForeignKey
+from sqlalchemy import Column, ForeignKey, BigInteger, Integer, Text, DateTime
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlmodel import Field, SQLModel, Relationship
@@ -304,6 +304,69 @@ class McpServerTool(SQLModel, AsyncAttrs, table=True):
         description="When the tool was last updated",
     )
     server: Optional[McpServer] = Relationship(back_populates="server_tools")
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class McpToolCallLog(SQLModel, AsyncAttrs, table=True):
+    """
+    Model for MCP tool call logs - stored in TimescaleDB hypertable.
+    No FK constraints for hypertable compatibility.
+    """
+
+    __tablename__ = "mcp_tool_call_logs"
+    __table_args__ = {"extend_existing": True}
+
+    called_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), primary_key=True, index=True),
+        description="When the tool was called (partition key)",
+    )
+    id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=True),
+    )
+    server_id: uuid.UUID = Field(
+        sa_column=Column(UUID(as_uuid=True), nullable=False, index=True),
+        description="Reference to MCP server (no FK for hypertable)",
+    )
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(UUID(as_uuid=True), nullable=True),
+        description="Reference to user who made the call",
+    )
+    tool_name: str = Field(
+        sa_column=Column(String(255), nullable=False, index=True),
+        description="Name of the tool called",
+    )
+    tool_type: str = Field(
+        sa_column=Column(String(20), nullable=False),
+        description="Type of tool (static/dynamic)",
+    )
+    arguments: Optional[Dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+        description="Tool call arguments (truncated)",
+    )
+    result_summary: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Truncated result summary",
+    )
+    status: str = Field(
+        sa_column=Column(String(20), nullable=False),
+        description="Call status (success/error)",
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Error message if failed",
+    )
+    duration_ms: int = Field(
+        sa_column=Column(Integer, nullable=False),
+        description="Execution duration in milliseconds",
+    )
 
     class Config:
         arbitrary_types_allowed = True

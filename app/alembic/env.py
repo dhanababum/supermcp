@@ -20,7 +20,8 @@ from src.models import (
     McpServer, 
     McpServerTool, 
     McpServerToken, 
-    ConnectorAccess
+    ConnectorAccess,
+    McpToolCallLog,
 )
 
 # this is the Alembic Config object, which provides
