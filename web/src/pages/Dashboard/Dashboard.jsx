@@ -1,18 +1,43 @@
-import React from 'react';
-import { useServers, useConnectors } from '../../hooks';
+import React, { useEffect, useCallback } from 'react';
+import { useServers, useConnectors, useAllServersMetrics } from '../../hooks';
 import { LoadingSpinner, ErrorMessage } from '../../components/common';
 import { StatCard } from '../../components/common/StatCard';
 import { ServerIcon, ActivityIcon, PlugIcon, WrenchIcon } from '../../components/icons/DashboardIcons';
+import { ServerMetricsCard, ToolUsageChart, RecentErrorsPanel } from './components';
 
 const Dashboard = () => {
   const { servers, loading: serversLoading, error: serversError } = useServers(true);
   const { connectors, loading: connectorsLoading, error: connectorsError } = useConnectors();
+  const { metricsMap, loading: metricsLoading, refetch: refetchMetrics } = useAllServersMetrics(servers, 24);
+
+  // Auto-refresh metrics every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (servers && servers.length > 0) {
+        refetchMetrics();
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [servers, refetchMetrics]);
 
   // Calculate statistics
   const totalServers = servers?.length || 0;
   const activeServers = servers?.filter(server => server.is_active)?.length || 0;
   const totalConnectors = connectors?.length || 0;
-  const totalTools = servers?.reduce((sum, server) => sum + (server.tools_count || 0), 0) || 0;
+
+  // Calculate aggregated metrics
+  const aggregatedMetrics = useCallback(() => {
+    let totalCalls = 0;
+    let totalErrors = 0;
+    Object.values(metricsMap).forEach(m => {
+      if (m?.totals) {
+        totalCalls += m.totals.total_calls || 0;
+        totalErrors += m.totals.total_errors || 0;
+      }
+    });
+    const errorRate = totalCalls > 0 ? (totalErrors / totalCalls * 100).toFixed(1) : '0.0';
+    return { totalCalls, totalErrors, errorRate };
+  }, [metricsMap])();
 
   if (serversLoading || connectorsLoading) {
     return <LoadingSpinner message="Loading dashboard..." />;
@@ -55,14 +80,53 @@ const Dashboard = () => {
           colorClass="purple" 
         />
         <StatCard 
-          title="Total Tools" 
-          value={totalTools} 
+          title="Tool Calls (24h)" 
+          value={aggregatedMetrics.totalCalls.toLocaleString()} 
           icon={WrenchIcon} 
           colorClass="orange" 
         />
       </div>
 
-      {/* Recent Activity & Quick Actions */}
+      {/* Server Observability Section */}
+      {servers && servers.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-surface-900">Server Observability</h2>
+            <div className="flex items-center space-x-3">
+              {aggregatedMetrics.totalErrors > 0 && (
+                <span className="px-3 py-1 text-sm font-medium bg-danger-50 text-danger-700 rounded-full">
+                  {aggregatedMetrics.errorRate}% Error Rate
+                </span>
+              )}
+              {metricsLoading && (
+                <span className="text-xs text-surface-500">Updating...</span>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {servers.slice(0, 8).map((server) => (
+              <ServerMetricsCard
+                key={server.id}
+                server={server}
+                metrics={metricsMap[server.id]}
+              />
+            ))}
+          </div>
+          {servers.length > 8 && (
+            <p className="text-sm text-surface-500 mt-3 text-center">
+              Showing 8 of {servers.length} servers
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Tool Usage & Errors Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <ToolUsageChart metricsMap={metricsMap} maxTools={5} />
+        <RecentErrorsPanel servers={servers} maxErrors={5} />
+      </div>
+
+      {/* Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Servers */}
         <div className="card p-6">
@@ -123,6 +187,7 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
     </div>
   );
 };

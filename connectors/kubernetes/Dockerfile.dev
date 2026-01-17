@@ -1,0 +1,46 @@
+# Development Dockerfile with hot reload support
+# 
+# Build from workspace root:
+#   docker build -f connectors/kubernetes/Dockerfile.dev -t kubernetes-connector:dev .
+#
+# Or use docker-compose with proper build context
+
+FROM python:3.12.2-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gettext-base \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install uv
+
+COPY mcp_pkg /workspace/mcp_pkg
+
+RUN mkdir -p /workspace/connectors/kubernetes
+
+COPY connectors/kubernetes/pyproject.toml connectors/kubernetes/uv.lock* /workspace/connectors/kubernetes/
+
+WORKDIR /workspace/connectors/kubernetes
+
+RUN uv sync --frozen || uv sync
+
+COPY connectors/kubernetes/ /workspace/connectors/kubernetes/
+
+RUN chmod +x /workspace/connectors/kubernetes/entrypoint.sh
+
+WORKDIR /workspace/connectors/kubernetes
+
+ENV PATH="/workspace/connectors/kubernetes/.venv/bin:$PATH" \
+    PYTHONPATH="/workspace/connectors/kubernetes"
+
+EXPOSE 8031
+
+CMD ["sh", "entrypoint.sh"]

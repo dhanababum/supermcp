@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { MenuIcon, ChevronRightIcon, SuperMCPIcon } from '../icons';
+import { MenuIcon, ChevronRightIcon, SuperMCPLightIcon } from '../icons';
 import { navigationItems } from '../../constants/navigation';
 import { API_BASE_URL } from '../../constants/env';
 
@@ -38,12 +38,7 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
       <div className={`flex items-center p-5 border-b border-slate-200 bg-white ${collapsed ? 'justify-center flex-col space-y-3' : 'justify-between'}`}>
         {!collapsed ? (
           <>
-            <div className="flex items-center space-x-3">
-               <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-600 rounded-xl flex items-center justify-center">
-                 <SuperMCPIcon className="w-5 h-5 text-white" />
-               </div>
-               <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">SuperMCP</span>
-            </div>
+            <SuperMCPLightIcon className="h-6" />
             <button
               onClick={onToggleCollapse}
               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all duration-200"
@@ -53,9 +48,7 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
           </>
         ) : (
           <>
-            <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-600 rounded-xl flex items-center justify-center">
-               <SuperMCPIcon className="w-5 h-5 text-white" />
-            </div>
+            <SuperMCPLightIcon className="h-6 w-6" />
             <button
               onClick={onToggleCollapse}
               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all duration-200"

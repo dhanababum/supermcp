@@ -15,7 +15,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse, JSONResponse
 
 from .auth import CustomTokenVerifier, verify_token
-from .middleware import CustomToolMiddleware
+from .middleware import CustomToolMiddleware, ObservabilityMiddleware
 from .config import settings
 from .schema import ConnectorTemplate, ConnectorConfig
 from .template_registery import TemplateMixin
@@ -196,6 +196,9 @@ def create_dynamic_mcp(
 
     mcp.add_middleware(
         CustomToolMiddleware(),
+    )
+    mcp.add_middleware(
+        ObservabilityMiddleware(log_endpoint=f"{settings.app_base_url}/api/logs"),
     )
     app.add_middleware(
         CORSMiddleware,
