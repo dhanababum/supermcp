@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Sidebar } from './components/layout';
+import { Sidebar, Header } from './components/layout';
 import { ErrorBoundary } from './components/common';
 import { Dashboard, Connectors, Servers, ServerTools, ServerTokens, MCPClient } from './pages';
 import { Auth } from './pages/Auth';
@@ -25,8 +25,8 @@ const ProtectedRoute = ({ children }) => {
   // Show loading spinner while checking auth
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-surface-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-brand-500 border-t-transparent"></div>
       </div>
     );
   }
@@ -45,7 +45,7 @@ const AppLayout = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-surface-100">
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -54,6 +54,9 @@ const AppLayout = ({ children }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <Header />
+        
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-6">
           {children}

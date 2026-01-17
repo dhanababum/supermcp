@@ -15,57 +15,57 @@ const ServerMetricsCard = ({ server, metrics }) => {
     : null;
 
   return (
-    <div className="card p-5 hover:shadow-lg transition-all duration-200 border-surface-200">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center">
-          <div className={`w-2.5 h-2.5 rounded-full mr-3 ${server.is_active ? 'bg-success-500' : 'bg-surface-400'}`} />
-          <div>
-            <h3 className="font-semibold text-surface-900 text-sm">{server.server_name}</h3>
-            <p className="text-xs text-surface-500 truncate max-w-[180px]">{server.id}</p>
+    <div className="card p-4">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center min-w-0">
+          <div className={`w-2 h-2 rounded-full mr-2.5 flex-shrink-0 ${server.is_active ? 'bg-brand-500' : 'bg-surface-300'}`} />
+          <div className="min-w-0">
+            <h3 className="font-medium text-surface-800 text-sm truncate">{server.server_name}</h3>
+            <p className="text-xs text-surface-400 truncate">{server.id}</p>
           </div>
         </div>
         {errorRate > 5 && (
-          <span className="px-2 py-0.5 text-xs font-medium bg-danger-50 text-danger-700 rounded-full">
-            High Errors
+          <span className="px-2 py-0.5 text-xs font-medium bg-error-50 text-error-700 rounded-full flex-shrink-0 ml-2">
+            High
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-surface-50 rounded-lg p-3">
-          <p className="text-xs text-surface-500 mb-1">Calls (24h)</p>
-          <p className="text-lg font-semibold text-surface-900">{totalCalls.toLocaleString()}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+          <p className="text-xs text-blue-600 mb-0.5">Calls (24h)</p>
+          <p className="text-base font-semibold text-blue-700">{totalCalls.toLocaleString()}</p>
         </div>
-        <div className="bg-surface-50 rounded-lg p-3">
-          <p className="text-xs text-surface-500 mb-1">Error Rate</p>
-          <p className={`text-lg font-semibold ${errorRate > 5 ? 'text-danger-600' : errorRate > 2 ? 'text-warning-600' : 'text-success-600'}`}>
+        <div className={`rounded-lg p-2.5 border ${errorRate > 5 ? 'bg-red-50 border-red-100' : errorRate > 2 ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100'}`}>
+          <p className={`text-xs mb-0.5 ${errorRate > 5 ? 'text-red-600' : errorRate > 2 ? 'text-amber-600' : 'text-green-600'}`}>Error Rate</p>
+          <p className={`text-base font-semibold ${errorRate > 5 ? 'text-red-700' : errorRate > 2 ? 'text-amber-700' : 'text-green-700'}`}>
             {errorRate.toFixed(1)}%
           </p>
         </div>
-        <div className="bg-surface-50 rounded-lg p-3">
-          <p className="text-xs text-surface-500 mb-1">Avg Response</p>
-          <p className="text-lg font-semibold text-surface-900">{avgDuration}ms</p>
+        <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-100">
+          <p className="text-xs text-amber-600 mb-0.5">Avg Response</p>
+          <p className="text-base font-semibold text-amber-700">{avgDuration}ms</p>
         </div>
-        <div className="bg-surface-50 rounded-lg p-3">
-          <p className="text-xs text-surface-500 mb-1">Tools</p>
-          <p className="text-lg font-semibold text-surface-900">{byTool.length}</p>
+        <div className="bg-violet-50 rounded-lg p-2.5 border border-violet-100">
+          <p className="text-xs text-violet-600 mb-0.5">Tools</p>
+          <p className="text-base font-semibold text-violet-700">{byTool.length}</p>
         </div>
       </div>
 
       {(mostUsedTool || mostFailingTool) && (
-        <div className="border-t border-surface-100 pt-3 mt-3 space-y-2">
+        <div className="border-t border-surface-100 pt-2.5 mt-3 space-y-1.5">
           {mostUsedTool && (
             <div className="flex items-center justify-between text-xs">
-              <span className="text-surface-500">Most Used</span>
-              <span className="font-medium text-surface-700 truncate max-w-[120px]" title={mostUsedTool.tool_name}>
+              <span className="text-surface-400">Most Used</span>
+              <span className="font-medium text-surface-600 truncate max-w-[100px]" title={mostUsedTool.tool_name}>
                 {mostUsedTool.tool_name}
               </span>
             </div>
           )}
           {mostFailingTool && (
             <div className="flex items-center justify-between text-xs">
-              <span className="text-surface-500">Most Errors</span>
-              <span className="font-medium text-danger-600 truncate max-w-[120px]" title={mostFailingTool.tool_name}>
+              <span className="text-surface-400">Most Errors</span>
+              <span className="font-medium text-error-600 truncate max-w-[100px]" title={mostFailingTool.tool_name}>
                 {mostFailingTool.tool_name} ({mostFailingTool.total_errors})
               </span>
             </div>

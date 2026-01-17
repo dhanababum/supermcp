@@ -33,81 +33,61 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
   };
 
   return (
-    <div className={`${collapsed ? 'w-16' : 'w-64'} bg-gradient-to-b from-white to-slate-50 border-r border-slate-200 transition-all duration-300 flex flex-col shadow-sm`}>
+    <div className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-surface-200 transition-all duration-300 flex flex-col shadow-sidebar`}>
       {/* Logo and Toggle */}
-      <div className={`flex items-center p-5 border-b border-slate-200 bg-white ${collapsed ? 'justify-center flex-col space-y-3' : 'justify-between'}`}>
-        {!collapsed ? (
-          <>
-            <SuperMCPLightIcon className="h-6" />
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all duration-200"
-            >
-              <MenuIcon />
-            </button>
-          </>
-        ) : (
-          <>
-            <SuperMCPLightIcon className="h-6 w-6" />
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all duration-200"
-            >
-              <MenuIcon />
-            </button>
-          </>
-        )}
+      <div className={`flex items-center h-16 px-4 border-b border-surface-100 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+        {!collapsed && <SuperMCPLightIcon className="h-7" />}
+        {collapsed && <SuperMCPLightIcon className="h-7 w-7" />}
+        <button
+          onClick={onToggleCollapse}
+          className={`p-2 rounded-lg hover:bg-surface-100 text-surface-400 hover:text-surface-600 transition-all duration-200 ${collapsed ? 'mt-2' : ''}`}
+        >
+          <MenuIcon />
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+      <nav className="flex-1 px-3 py-5 overflow-y-auto">
+        <div className="space-y-1">
           {navigationItems.map((item) => {
-             const isActive = currentRoute === item.route;
-             return (
+            const isActive = currentRoute === item.route;
+            return (
               <Link
                 key={item.id}
                 to={`/${item.route}`}
-                className={`relative w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-4 py-3 text-sm transition-all duration-200 group ${
+                className={`relative flex items-center ${collapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group ${
                   isActive
-                    ? 'text-brand-600'
-                    : 'text-slate-600 hover:text-brand-600'
+                    ? 'bg-brand-50 text-brand-600 font-medium'
+                    : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
                 }`}
                 title={collapsed ? item.name : ''}
               >
-                <div className="flex items-center space-x-3 relative">
-                  <span className={`${isActive ? 'text-brand-600' : 'text-slate-500 group-hover:text-brand-600'} transition-colors`}>
-                    <item.icon />
-                  </span>
-                  {!collapsed && (
-                    <span className={`font-medium ${isActive ? 'font-semibold' : ''}`}>
-                      {item.name}
-                    </span>
-                  )}
-                </div>
-                {!collapsed && item.hasSubmenu && (
-                  <ChevronRightIcon className={`w-4 h-4 ${isActive ? 'text-brand-600' : 'text-slate-400'}`} />
-                )}
-                {/* Elegant underline for active item */}
                 {isActive && (
-                  <div className="absolute bottom-0 left-3 right-3 h-0.5 bg-gradient-to-r from-brand-500 to-brand-400 rounded-full" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-brand-500 rounded-r-full" />
                 )}
-                {/* Subtle hover effect */}
-                {!isActive && (
-                  <div className="absolute inset-0 bg-slate-100 opacity-0 group-hover:opacity-100 rounded-lg transition-opacity duration-200 -z-10" />
+                <span className={`flex-shrink-0 ${isActive ? 'text-brand-500' : 'text-surface-400 group-hover:text-surface-600'} transition-colors`}>
+                  <item.icon />
+                </span>
+                {!collapsed && (
+                  <span className="ml-3">{item.name}</span>
+                )}
+                {!collapsed && item.hasSubmenu && (
+                  <ChevronRightIcon className={`ml-auto w-4 h-4 ${isActive ? 'text-brand-500' : 'text-surface-400'}`} />
                 )}
               </Link>
             );
           })}
+        </div>
       </nav>
 
       {/* Logout Button */}
-      <div className="p-3 border-t border-slate-200 bg-white">
+      <div className="p-3 border-t border-surface-100">
         <button
           onClick={handleLogout}
-          className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start'} px-4 py-3 rounded-lg text-sm transition-all duration-200 text-slate-600 hover:text-error-600 hover:bg-error-50 group`}
+          className={`w-full flex items-center ${collapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-sm transition-all duration-200 text-surface-500 hover:text-error-600 hover:bg-error-50`}
           title={collapsed ? 'Logout' : ''}
         >
-          <svg className="w-5 h-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           {!collapsed && <span className="ml-3 font-medium">Logout</span>}

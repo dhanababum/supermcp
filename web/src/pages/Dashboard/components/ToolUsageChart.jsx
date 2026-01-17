@@ -26,17 +26,17 @@ const ToolUsageChart = ({ metricsMap, maxTools = 5 }) => {
 
   if (sortedTools.length === 0) {
     return (
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">Tool Usage</h3>
-        <p className="text-surface-500 text-sm text-center py-8">No tool usage data available</p>
+      <div className="card p-5">
+        <h3 className="text-base font-semibold text-surface-800 mb-4">Tool Usage</h3>
+        <p className="text-surface-400 text-sm text-center py-6">No tool usage data available</p>
       </div>
     );
   }
 
   return (
-    <div className="card p-6">
-      <h3 className="text-lg font-semibold text-surface-900 mb-4">Top Tools by Usage</h3>
-      <div className="space-y-3">
+    <div className="card p-5">
+      <h3 className="text-base font-semibold text-surface-800 mb-4">Top Tools by Usage</h3>
+      <div className="space-y-4">
         {sortedTools.map((tool, index) => {
           const percentage = (tool.total_calls / maxCalls) * 100;
           const errorPercentage = tool.total_calls > 0 
@@ -44,32 +44,32 @@ const ToolUsageChart = ({ metricsMap, maxTools = 5 }) => {
             : 0;
 
           return (
-            <div key={tool.tool_name} className="group">
-              <div className="flex items-center justify-between mb-1">
+            <div key={tool.tool_name}>
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center min-w-0">
-                  <span className="text-xs font-medium text-surface-400 w-5">{index + 1}.</span>
-                  <span className="text-sm font-medium text-surface-700 truncate" title={tool.tool_name}>
+                  <span className="text-xs text-surface-400 w-4">{index + 1}.</span>
+                  <span className="text-sm text-surface-700 truncate" title={tool.tool_name}>
                     {tool.tool_name}
                   </span>
                 </div>
-                <div className="flex items-center space-x-3 text-xs">
-                  <span className="font-semibold text-surface-900">{tool.total_calls.toLocaleString()}</span>
+                <div className="flex items-center space-x-2 text-xs">
+                  <span className="font-medium text-surface-800">{tool.total_calls.toLocaleString()}</span>
                   {tool.total_errors > 0 && (
-                    <span className="text-danger-600 font-medium">
-                      {tool.total_errors} errors
+                    <span className="text-error-600">
+                      ({tool.total_errors})
                     </span>
                   )}
                 </div>
               </div>
-              <div className="h-2 bg-surface-100 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-surface-100 rounded-full overflow-hidden">
                 <div className="h-full flex rounded-full">
                   <div 
-                    className="bg-brand-500 transition-all duration-300"
+                    className="bg-brand-400 transition-all duration-300 rounded-full"
                     style={{ width: `${percentage - (percentage * errorPercentage / 100)}%` }}
                   />
                   {errorPercentage > 0 && (
                     <div 
-                      className="bg-danger-400"
+                      className="bg-error-400 rounded-r-full"
                       style={{ width: `${percentage * errorPercentage / 100}%` }}
                     />
                   )}
@@ -79,14 +79,14 @@ const ToolUsageChart = ({ metricsMap, maxTools = 5 }) => {
           );
         })}
       </div>
-      <div className="mt-4 pt-3 border-t border-surface-100 flex items-center justify-center space-x-6 text-xs">
+      <div className="mt-4 pt-3 border-t border-surface-100 flex items-center justify-center space-x-4 text-xs">
         <div className="flex items-center">
-          <div className="w-3 h-3 bg-brand-500 rounded mr-2" />
-          <span className="text-surface-600">Success</span>
+          <div className="w-2.5 h-2.5 bg-brand-400 rounded-full mr-1.5" />
+          <span className="text-surface-500">Success</span>
         </div>
         <div className="flex items-center">
-          <div className="w-3 h-3 bg-danger-400 rounded mr-2" />
-          <span className="text-surface-600">Errors</span>
+          <div className="w-2.5 h-2.5 bg-error-400 rounded-full mr-1.5" />
+          <span className="text-surface-500">Errors</span>
         </div>
       </div>
     </div>

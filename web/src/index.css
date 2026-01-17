@@ -24,30 +24,54 @@
 }
 
 @layer components {
-  /* Modern Card Style */
+  /* Modern Card Style - Clean TailAdmin inspired */
   .card {
-    @apply bg-white border border-surface-200 rounded-xl shadow-card;
+    @apply bg-white border border-surface-200 rounded-xl shadow-card transition-shadow duration-200;
+  }
+
+  .card:hover {
+    @apply shadow-card-hover;
   }
 
   /* Primary Button */
   .btn-primary {
-    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent 
-    text-sm font-medium rounded-lg shadow-sm text-white bg-brand-600 
-    hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500;
+    @apply inline-flex items-center justify-center px-4 py-2.5 border border-transparent 
+    text-sm font-medium rounded-lg text-white bg-brand-500 
+    hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-400
+    transition-all duration-200;
   }
 
   /* Secondary Button */
   .btn-secondary {
-    @apply inline-flex items-center justify-center px-4 py-2 border border-surface-300 
+    @apply inline-flex items-center justify-center px-4 py-2.5 border border-surface-200 
     text-sm font-medium rounded-lg text-surface-700 bg-white 
-    hover:bg-surface-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500;
+    hover:bg-surface-50 hover:border-surface-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-400
+    transition-all duration-200;
   }
 
   /* Form Input */
   .form-input {
-    @apply block w-full rounded-lg border-surface-300 shadow-sm 
+    @apply block w-full rounded-lg border-surface-200 shadow-sm 
     focus:border-brand-500 focus:ring-brand-500 sm:text-sm
-    placeholder-surface-400 text-surface-900;
+    placeholder-surface-400 text-surface-900 bg-white;
+  }
+
+  /* Search Input */
+  .search-input {
+    @apply w-full pl-10 pr-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg
+    text-sm text-surface-900 placeholder-surface-400
+    focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400
+    transition-all duration-200;
+  }
+
+  /* Section Header */
+  .section-header {
+    @apply text-lg font-semibold text-surface-800 mb-4;
+  }
+
+  /* Stat Box - for inner metric displays */
+  .stat-box {
+    @apply bg-surface-50 rounded-lg p-3 border border-surface-100;
   }
 }
 

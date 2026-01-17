@@ -582,7 +582,7 @@ const MCPClientAdvanced = () => {
             <button
               onClick={handleConnect}
               disabled={isConnecting || isConnected || (useServerSelection && (!selectedServer || !selectedToken)) || (!useServerSelection && !serverUrl.trim())}
-              className="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-brand-100 text-brand-700 rounded-md hover:bg-brand-200 border border-brand-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isConnecting ? 'Connecting...' : 'Connect'}
             </button>
@@ -591,7 +591,7 @@ const MCPClientAdvanced = () => {
           <button
             onClick={handleDisconnect}
             disabled={!isConnected}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Disconnect
           </button>
@@ -600,7 +600,7 @@ const MCPClientAdvanced = () => {
             <button
               onClick={handleRetry}
               disabled={isConnecting}
-              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-amber-100 text-amber-700 rounded-md hover:bg-amber-200 border border-amber-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Retry
             </button>
@@ -658,7 +658,7 @@ const MCPClientAdvanced = () => {
               <button
                 onClick={handleCallTool}
                 disabled={!isConnected}
-                className="w-full px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 bg-brand-100 text-brand-700 rounded-md hover:bg-brand-200 border border-brand-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Call Tool
               </button>
@@ -716,7 +716,7 @@ const MCPClientAdvanced = () => {
             <button
               onClick={handleSendMessage}
               disabled={!isConnected || !inputMessage.trim()}
-              className="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-brand-100 text-brand-700 rounded-md hover:bg-brand-200 border border-brand-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Send
             </button>
