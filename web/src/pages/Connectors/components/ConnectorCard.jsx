@@ -75,7 +75,7 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
 
       <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
         <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-blue-500 rounded-lg flex items-center justify-center overflow-hidden">
+        <div className="w-12 h-12 bg-white border border-surface-200 rounded-lg flex items-center justify-center overflow-hidden">
           {logoUrl && !logoError ? (
             <img 
               src={logoUrl} 
@@ -87,7 +87,7 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
               }}
             />
           ) : (
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
             </svg>
           )}
@@ -190,9 +190,12 @@ const ConnectorCard = ({ connector, onConfigure, onDelete, onActivate, onRegiste
             // Active Mode: Show Create Server button
             <button 
               onClick={() => onConfigure(connector)}
-              className="flex-1 px-3 py-2 bg-brand-100 text-brand-700 text-sm font-medium rounded-lg hover:bg-brand-200 border border-brand-300"
+              className="flex-1 px-3 py-2 bg-brand-100 text-brand-700 text-sm font-medium rounded-lg hover:bg-brand-200 border border-brand-300 flex items-center justify-center space-x-2"
             >
-              Create Server
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Create Server</span>
             </button>
           ) : isDeactive && !isSuperuser() ? (
             // Non-superuser with deactive connector
