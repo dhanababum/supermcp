@@ -9,9 +9,39 @@
 
 ## 📹 Introduction Video
 
-[![SuperMCP Introduction](https://img.youtube.com/vi/y44Pjc5p1Zg/0.jpg)](https://www.youtube.com/watch?v=y44Pjc5p1Zg)
+### SuperMCP Introduction
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=y44Pjc5p1Zg">
+    <img src="https://img.youtube.com/vi/y44Pjc5p1Zg/maxresdefault.jpg" alt="SuperMCP Introduction - Click to play" style="width:100%;max-width:640px;border-radius:8px;cursor:pointer;">
+  </a>
+  <br>
+  <a href="https://www.youtube.com/watch?v=y44Pjc5p1Zg">▶️ Watch on YouTube</a>
+</div>
 
-[![SuperMCP new design](https://img.youtube.com/vi/fwPdaSINrfA/0.jpg)](https://youtu.be/fwPdaSINrfA)
+<details>
+  <summary><b>🎥 Play video inline (click to expand)</b></summary>
+  <br>
+  <div align="center">
+    <iframe width="640" height="360" src="https://www.youtube.com/embed/y44Pjc5p1Zg" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width:100%;border-radius:8px;"></iframe>
+  </div>
+</details>
+
+### SuperMCP new design
+<div align="center">
+  <a href="https://youtu.be/fwPdaSINrfA">
+    <img src="https://img.youtube.com/vi/fwPdaSINrfA/maxresdefault.jpg" alt="SuperMCP new design - Click to play" style="width:100%;max-width:640px;border-radius:8px;cursor:pointer;">
+  </a>
+  <br>
+  <a href="https://youtu.be/fwPdaSINrfA">▶️ Watch on YouTube</a>
+</div>
+
+<details>
+  <summary><b>🎥 Play video inline (click to expand)</b></summary>
+  <br>
+  <div align="center">
+    <iframe width="640" height="360" src="https://www.youtube.com/embed/fwPdaSINrfA" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width:100%;border-radius:8px;"></iframe>
+  </div>
+</details>
 
 ## 🎯 What is SuperMCP?
 
