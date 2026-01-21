@@ -18,14 +18,6 @@
   <a href="https://www.youtube.com/watch?v=y44Pjc5p1Zg">▶️ Watch on YouTube</a>
 </div>
 
-<details>
-  <summary><b>🎥 Play video inline (click to expand)</b></summary>
-  <br>
-  <div align="center">
-    <iframe width="640" height="360" src="https://www.youtube.com/embed/y44Pjc5p1Zg" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width:100%;border-radius:8px;"></iframe>
-  </div>
-</details>
-
 ### SuperMCP new design
 <div align="center">
   <a href="https://youtu.be/fwPdaSINrfA">
@@ -34,14 +26,6 @@
   <br>
   <a href="https://youtu.be/fwPdaSINrfA">▶️ Watch on YouTube</a>
 </div>
-
-<details>
-  <summary><b>🎥 Play video inline (click to expand)</b></summary>
-  <br>
-  <div align="center">
-    <iframe width="640" height="360" src="https://www.youtube.com/embed/fwPdaSINrfA" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width:100%;border-radius:8px;"></iframe>
-  </div>
-</details>
 
 ## 🎯 What is SuperMCP?
 
