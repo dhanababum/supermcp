@@ -11,7 +11,7 @@
 
 [![SuperMCP Introduction](https://img.youtube.com/vi/y44Pjc5p1Zg/0.jpg)](https://www.youtube.com/watch?v=y44Pjc5p1Zg)
 
-[![SuperMCP new design](https://img.youtube.com/vi/fwPdaSINrfA/0.jpg)] (https://youtu.be/fwPdaSINrfA)
+[![SuperMCP new design](https://img.youtube.com/vi/fwPdaSINrfA/0.jpg)](https://youtu.be/fwPdaSINrfA)
 
 ## 🎯 What is SuperMCP?
 
