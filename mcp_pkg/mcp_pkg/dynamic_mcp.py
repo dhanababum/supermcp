@@ -15,7 +15,12 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse, JSONResponse
 
 from .auth import CustomTokenVerifier, verify_token
-from .middleware import CustomToolMiddleware, ObservabilityMiddleware
+from .middleware import (
+    CustomToolMiddleware,
+    ObservabilityMiddleware,
+    SessionTrackingMiddleware,
+    get_session_store,
+)
 from .config import settings
 from .schema import ConnectorTemplate, ConnectorConfig
 from .template_registery import TemplateMixin
@@ -194,12 +199,18 @@ def create_dynamic_mcp(
 
     app = Starlette(lifespan=combined_lifespan)
 
+    session_tracker = SessionTrackingMiddleware(idle_timeout=300)
     mcp.add_middleware(
         CustomToolMiddleware(),
     )
     mcp.add_middleware(
-        ObservabilityMiddleware(log_endpoint=f"{settings.app_base_url}/api/logs"),
+        ObservabilityMiddleware(
+            log_endpoint=f"{settings.app_base_url}/api/logs",
+            max_result_len=1000,
+            max_value_len=1000,
+        ),
     )
+    mcp.add_middleware(session_tracker)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origin_urls,
@@ -283,6 +294,13 @@ def create_dynamic_mcp(
 
         return JSONResponse({"message": f"Server {server_id} destroyed"})
 
+    async def get_active_sessions(request: Request):
+        """Get count of active client sessions (real-time from memory)."""
+        return JSONResponse({
+            "active_sessions": session_tracker.get_active_count(),
+            "sessions": session_tracker.get_active_sessions(),
+        })
+
     app.add_route(
         path="/connector.json",
         methods=["GET"],
@@ -303,11 +321,11 @@ def create_dynamic_mcp(
         methods=["POST"],
         route=destroy_mcp_server,
     )
-    # app.add_route(
-    #     path="/create-tool/{tool_id}",
-    #     methods=["POST"],
-    #     route=create_new_mcp_tool,
-    # )
+    app.add_route(
+        path="/sessions/active",
+        methods=["GET"],
+        route=get_active_sessions,
+    )
     print(app.routes)
     return mcp, app
 

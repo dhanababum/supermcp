@@ -80,6 +80,32 @@ services:
       retries: 3
       start_period: 20s
 
+  # Neo4j Graph Database Connector
+  neo4j-connector:
+    build:
+      context: ..
+      dockerfile: connectors/neo4j/Dockerfile.dev
+    environment:
+      CONNECTOR_ID: ${NEO4J_CONNECTOR_ID:-neo4j-connector-id}
+      CONNECTOR_SECRET: ${NEO4J_CONNECTOR_SECRET:-neo4j-connector-secret}
+      APP_BASE_URL: http://app:9000
+      ORIGIN_URLS: '["http://web:3000", "http://localhost:3001"]'
+      PORT: 8032
+      WORKERS: 1
+    ports:
+      - "8032:8032"
+    volumes:
+      - ../mcp_pkg:/app/mcp_pkg
+      - ../connectors/neo4j:/app
+    networks:
+      - sharednet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8032/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
 networks:
   sharednet:
     external: true

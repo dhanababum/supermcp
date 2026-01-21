@@ -105,13 +105,17 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {servers.slice(0, 8).map((server) => (
-              <ServerMetricsCard
-                key={server.id}
-                server={server}
-                metrics={metricsMap[server.id]}
-              />
-            ))}
+            {servers.slice(0, 8).map((server) => {
+              const connector = connectors?.find(c => c.id === server.connector_id);
+              return (
+                <ServerMetricsCard
+                  key={server.id}
+                  server={server}
+                  metrics={metricsMap[server.id]}
+                  connector={connector}
+                />
+              );
+            })}
           </div>
           {servers.length > 8 && (
             <p className="text-xs text-surface-400 mt-3 text-center">

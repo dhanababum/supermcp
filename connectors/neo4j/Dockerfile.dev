@@ -1,0 +1,46 @@
+# Development Dockerfile with hot reload support
+#
+# Build from workspace root:
+#   docker build -f connectors/neo4j/Dockerfile.dev -t neo4j-connector:dev .
+#
+# Or use docker-compose with proper build context
+
+FROM python:3.12.2-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gettext-base \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install uv
+
+COPY mcp_pkg /workspace/mcp_pkg
+
+RUN mkdir -p /workspace/connectors/neo4j
+
+COPY connectors/neo4j/pyproject.toml connectors/neo4j/uv.lock* /workspace/connectors/neo4j/
+
+WORKDIR /workspace/connectors/neo4j
+
+RUN uv sync --frozen || uv sync
+
+COPY connectors/neo4j/ /workspace/connectors/neo4j/
+
+RUN chmod +x /workspace/connectors/neo4j/entrypoint.sh
+
+WORKDIR /workspace/connectors/neo4j
+
+ENV PATH="/workspace/connectors/neo4j/.venv/bin:$PATH" \
+    PYTHONPATH="/workspace/connectors/neo4j"
+
+EXPOSE 8032
+
+CMD ["sh", "entrypoint.sh"]

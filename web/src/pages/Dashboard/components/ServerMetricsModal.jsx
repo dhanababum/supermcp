@@ -33,6 +33,79 @@ const ServerMetricsModal = ({ server, onClose }) => {
     return new Date(dateStr).toLocaleString();
   };
 
+  const formatContent = (data) => {
+    if (data === null || data === undefined) {
+      return 'null';
+    }
+    
+    // Handle arrays (including empty arrays)
+    if (Array.isArray(data)) {
+      try {
+        return JSON.stringify(data, null, 2);
+      } catch (e) {
+        return String(data);
+      }
+    }
+    
+    // Handle objects (including Date, Error, etc.)
+    if (typeof data === 'object') {
+      // Check if it's a plain object (not a class instance)
+      if (data.constructor === Object) {
+        try {
+          return JSON.stringify(data, null, 2);
+        } catch (e) {
+          return String(data);
+        }
+      } else {
+        // For class instances, try to stringify, fallback to toString
+        try {
+          const jsonStr = JSON.stringify(data, null, 2);
+          // If stringification worked but might be empty object, show toString
+          if (jsonStr === '{}' || jsonStr === '[]') {
+            return String(data);
+          }
+          return jsonStr;
+        } catch (e) {
+          return String(data);
+        }
+      }
+    }
+    
+    // Handle strings - try to parse as JSON first
+    if (typeof data === 'string') {
+      // Check if it's a JSON string (starts with {, [, or " and is parseable)
+      const trimmed = data.trim();
+      if ((trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('"')) && trimmed.length > 1) {
+        try {
+          const parsed = JSON.parse(data);
+          // If parsed successfully, format it
+          return JSON.stringify(parsed, null, 2);
+        } catch (e) {
+          // Not valid JSON, return as plain text
+          return data;
+        }
+      }
+      // Plain text string
+      return data;
+    }
+    
+    // Handle numbers, booleans, etc.
+    if (typeof data === 'number' || typeof data === 'boolean') {
+      return String(data);
+    }
+    
+    // Fallback to string conversion
+    return String(data);
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      // Could add a toast notification here
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -270,10 +343,10 @@ const ServerMetricsModal = ({ server, onClose }) => {
                       </div>
 
                       {/* Right Panel - Detail View */}
-                      <div className="w-3/5 overflow-auto">
+                      <div className="w-3/5 flex flex-col h-full">
                         {selectedLog ? (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
+                          <div className="flex flex-col h-full space-y-4 overflow-hidden">
+                            <div className="flex items-center justify-between flex-shrink-0">
                               <div className="flex items-center space-x-2">
                                 <span className={`px-2 py-0.5 text-xs font-medium rounded ${
                                   selectedLog.status === 'error' 
@@ -288,7 +361,7 @@ const ServerMetricsModal = ({ server, onClose }) => {
                             </div>
 
                             {selectedLog.error_message && (
-                              <div>
+                              <div className="flex-shrink-0">
                                 <h4 className="text-xs font-medium text-danger-700 mb-1">Error</h4>
                                 <p className="text-sm text-danger-700 bg-danger-50 p-3 rounded-lg">
                                   {selectedLog.error_message}
@@ -296,19 +369,43 @@ const ServerMetricsModal = ({ server, onClose }) => {
                               </div>
                             )}
 
-                            <div>
-                              <h4 className="text-xs font-medium text-surface-500 mb-1">Arguments</h4>
-                              <pre className="text-xs bg-surface-50 p-3 rounded-lg overflow-auto max-h-40 text-surface-700">
+                            <div className="flex-shrink-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <h4 className="text-xs font-medium text-surface-500">Arguments</h4>
+                                {selectedLog.arguments && (
+                                  <button
+                                    onClick={() => copyToClipboard(formatContent(selectedLog.arguments) || '')}
+                                    className="text-xs text-brand-600 hover:text-brand-700 px-2 py-1 rounded hover:bg-brand-50 transition-colors"
+                                    title="Copy to clipboard"
+                                  >
+                                    Copy
+                                  </button>
+                                )}
+                              </div>
+                              <pre className="text-xs bg-surface-50 p-4 rounded-lg overflow-auto max-h-64 text-surface-700 font-mono whitespace-pre-wrap break-words border border-surface-200">
                                 {selectedLog.arguments 
-                                  ? JSON.stringify(selectedLog.arguments, null, 2)
+                                  ? formatContent(selectedLog.arguments)
                                   : 'No arguments'}
                               </pre>
                             </div>
 
-                            <div>
-                              <h4 className="text-xs font-medium text-surface-500 mb-1">Response</h4>
-                              <pre className="text-xs bg-surface-50 p-3 rounded-lg overflow-auto max-h-40 text-surface-700">
-                                {selectedLog.result_summary || 'No response data'}
+                            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                              <div className="flex items-center justify-between mb-1 flex-shrink-0">
+                                <h4 className="text-xs font-medium text-surface-500">Response</h4>
+                                {selectedLog.result_summary && (
+                                  <button
+                                    onClick={() => copyToClipboard(formatContent(selectedLog.result_summary) || '')}
+                                    className="text-xs text-brand-600 hover:text-brand-700 px-2 py-1 rounded hover:bg-brand-50 transition-colors"
+                                    title="Copy to clipboard"
+                                  >
+                                    Copy
+                                  </button>
+                                )}
+                              </div>
+                              <pre className="text-xs bg-surface-50 p-4 rounded-lg overflow-auto flex-1 text-surface-700 font-mono whitespace-pre-wrap break-words border border-surface-200">
+                                {selectedLog.result_summary 
+                                  ? formatContent(selectedLog.result_summary)
+                                  : 'No response data'}
                               </pre>
                             </div>
                           </div>

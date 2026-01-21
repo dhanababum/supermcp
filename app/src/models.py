@@ -336,6 +336,11 @@ class McpToolCallLog(SQLModel, AsyncAttrs, table=True):
         sa_column=Column(UUID(as_uuid=True), nullable=True),
         description="Reference to user who made the call",
     )
+    session_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String(255), nullable=True),
+        description="MCP session ID for tracking connected clients",
+    )
     tool_name: str = Field(
         sa_column=Column(String(255), nullable=False, index=True),
         description="Name of the tool called",
