@@ -1905,6 +1905,7 @@ async def create_tool_call_log(
         status=log_data.get("status", "unknown"),
         error_message=log_data.get("error_message"),
         duration_ms=log_data.get("duration_ms", 0),
+        session_id=log_data.get("session_id"),
     )
     session.add(log)
     await session.commit()
@@ -2109,6 +2110,34 @@ async def get_server_metrics_summary(
         except Exception:
             pass
 
+    # Get active sessions count (clients active in last 5 minutes)
+    active_sessions = 0
+    try:
+        sessions_query = text("""
+            SELECT COUNT(DISTINCT session_id) AS active_sessions
+            FROM mcp_tool_call_logs
+            WHERE server_id = :server_id
+            AND session_id IS NOT NULL
+            AND called_at >= NOW() - INTERVAL '5 minutes'
+        """)
+        sessions_result = await session.execute(sessions_query, {"server_id": server_id})
+        sessions_row = sessions_result.mappings().first()
+        active_sessions = sessions_row["active_sessions"] if sessions_row else 0
+    except Exception:
+        pass
+
+    # Get total count of active tools available on the server
+    total_tools_count = 0
+    try:
+        tools_count_query = select(func.count(McpServerTool.id)).where(
+            McpServerTool.mcp_server_id == server_id,
+            McpServerTool.is_active.is_(True)
+        )
+        tools_count_result = await session.execute(tools_count_query)
+        total_tools_count = tools_count_result.scalar() or 0
+    except Exception:
+        pass
+
     return {
         "server_id": str(server_id),
         "period_hours": hours,
@@ -2119,9 +2148,59 @@ async def get_server_metrics_summary(
             "error_rate": round(
                 (totals.get("total_errors") or 0) / (totals.get("total_calls") or 1) * 100, 2
             ),
+            "active_sessions": active_sessions,
+            "total_tools": total_tools_count,
         },
         "by_tool": tools,
     }
+
+
+@router.get("/servers/{server_id}/sessions/active")
+async def get_active_sessions(
+    server_id: uuid.UUID,
+    minutes: int = Query(default=5, ge=1, le=60),
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+) -> dict:
+    """Get count of active client sessions based on recent tool calls."""
+    server = await session.execute(
+        select(McpServer).where(
+            McpServer.id == server_id,
+            McpServer.user_id == current_user.id,
+            McpServer.is_active.is_(True),
+        )
+    )
+    server = server.scalars().first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    try:
+        query = text(f"""
+            SELECT 
+                COUNT(DISTINCT session_id) AS active_sessions,
+                array_agg(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL) AS session_ids
+            FROM mcp_tool_call_logs
+            WHERE server_id = :server_id
+            AND session_id IS NOT NULL
+            AND called_at >= NOW() - INTERVAL '{minutes} minutes'
+        """)
+        result = await session.execute(query, {"server_id": server_id})
+        row = result.mappings().first()
+        
+        return {
+            "server_id": str(server_id),
+            "active_sessions": row["active_sessions"] if row else 0,
+            "session_ids": row["session_ids"] if row and row["session_ids"] else [],
+            "window_minutes": minutes,
+        }
+    except Exception as e:
+        return {
+            "server_id": str(server_id),
+            "active_sessions": 0,
+            "session_ids": [],
+            "window_minutes": minutes,
+            "error": str(e),
+        }
 
 
 app.include_router(router)

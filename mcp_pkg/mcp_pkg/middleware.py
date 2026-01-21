@@ -2,9 +2,11 @@ from ast import List
 import asyncio
 import time
 import logging
+import threading
+from typing import Dict
 import httpx
 from fastmcp.server.middleware.middleware import Middleware, MiddlewareContext, CallNext
-from fastmcp.server.dependencies import get_access_token
+from fastmcp.server.dependencies import get_access_token, get_http_request
 from fastmcp.tools import Tool
 from fastmcp.exceptions import ToolError
 from fastmcp.tools.tool import ToolResult, MCPTool
@@ -14,6 +16,64 @@ from .schema import AppServerTool, ToolType
 from .config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class SessionStore:
+    """Thread-safe in-memory store for tracking active MCP sessions."""
+    
+    def __init__(self, idle_timeout: int = 300):
+        self._sessions: Dict[str, Dict] = {}
+        self._lock = threading.Lock()
+        self._idle_timeout = idle_timeout
+    
+    def update(self, session_id: str, user_id: str = None) -> None:
+        """Update session with current timestamp."""
+        if not session_id:
+            return
+        with self._lock:
+            self._sessions[session_id] = {
+                "last_seen": time.time(),
+                "user_id": user_id,
+            }
+    
+    def cleanup_stale(self) -> int:
+        """Remove sessions that have been idle longer than timeout."""
+        now = time.time()
+        removed = 0
+        with self._lock:
+            stale = [
+                sid for sid, data in self._sessions.items()
+                if now - data["last_seen"] > self._idle_timeout
+            ]
+            for sid in stale:
+                del self._sessions[sid]
+                removed += 1
+        return removed
+    
+    def get_active_count(self) -> int:
+        """Return count of active sessions."""
+        self.cleanup_stale()
+        with self._lock:
+            return len(self._sessions)
+    
+    def get_active_sessions(self) -> Dict[str, Dict]:
+        """Return copy of all active sessions."""
+        self.cleanup_stale()
+        with self._lock:
+            return dict(self._sessions)
+
+
+# Global session store (shared across all servers in a connector)
+_session_store = SessionStore(idle_timeout=300)
+
+
+def get_session_id() -> str | None:
+    """Extract session_id from MCP request headers."""
+    try:
+        request = get_http_request()
+        return request.headers.get("mcp-session-id")
+    except Exception:
+        return None
 
 
 class CustomToolMiddleware(Middleware):
@@ -108,8 +168,15 @@ class ObservabilityMiddleware(Middleware):
     Sends logs asynchronously to avoid blocking tool responses.
     """
 
-    def __init__(self, log_endpoint: str = None):
+    def __init__(
+        self, 
+        log_endpoint: str = None,
+        max_result_len: int = 500,
+        max_value_len: int = 500
+    ):
         self.log_endpoint = log_endpoint or f"{settings.app_base_url}/api/logs"
+        self.max_result_len = max_result_len
+        self.max_value_len = max_value_len
 
     async def on_call_tool(self, context: MiddlewareContext, call_next: CallNext):
         start_time = time.perf_counter()
@@ -120,6 +187,8 @@ class ObservabilityMiddleware(Middleware):
             access_token = get_access_token()
         except Exception:
             access_token = None
+
+        session_id = get_session_id()
 
         tool_type = "static"
         if access_token:
@@ -133,18 +202,19 @@ class ObservabilityMiddleware(Middleware):
         try:
             result = await call_next(context)
             duration_ms = int((time.perf_counter() - start_time) * 1000)
-            result_summary = self._extract_result_summary(result)
+            result_summary = self._extract_result_summary(result, max_len=self.max_result_len)
 
             if access_token:
                 asyncio.create_task(self._log_tool_call(
                     access_token=access_token.token,
                     tool_name=tool_name,
                     tool_type=tool_type,
-                    arguments=self._truncate_dict(arguments),
+                    arguments=self._truncate_dict(arguments, max_value_len=self.max_value_len),
                     status="success",
                     duration_ms=duration_ms,
                     result_summary=result_summary,
                     error_message=None,
+                    session_id=session_id,
                 ))
 
             return result
@@ -157,11 +227,15 @@ class ObservabilityMiddleware(Middleware):
                     access_token=access_token.token,
                     tool_name=tool_name,
                     tool_type=tool_type,
-                    arguments=self._truncate_dict(arguments),
+                    arguments=self._truncate_dict(
+                        arguments,
+                        max_value_len=self.max_value_len
+                    ),
                     status="error",
                     duration_ms=duration_ms,
                     result_summary=None,
                     error_message=str(e)[:1000],
+                    session_id=session_id,
                 ))
             raise
 
@@ -175,6 +249,7 @@ class ObservabilityMiddleware(Middleware):
         duration_ms: int,
         result_summary: str | None,
         error_message: str | None,
+        session_id: str | None = None,
     ):
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -188,6 +263,7 @@ class ObservabilityMiddleware(Middleware):
                         "duration_ms": duration_ms,
                         "result_summary": result_summary,
                         "error_message": error_message,
+                        "session_id": session_id,
                     },
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
@@ -225,7 +301,8 @@ class ObservabilityMiddleware(Middleware):
         else:
             summary = str(result)
         
-        if len(summary) > max_len:
+        # If max_len is 0 or less, don't truncate
+        if max_len > 0 and len(summary) > max_len:
             return summary[:max_len] + "...[truncated]"
         return summary if summary else None
 
@@ -235,8 +312,51 @@ class ObservabilityMiddleware(Middleware):
         truncated = {}
         for k, v in data.items():
             str_v = str(v)
-            if len(str_v) > max_value_len:
+            # If max_value_len is 0 or less, don't truncate
+            if max_value_len > 0 and len(str_v) > max_value_len:
                 truncated[k] = str_v[:max_value_len] + "...[truncated]"
             else:
                 truncated[k] = v
         return truncated
+
+
+class SessionTrackingMiddleware(Middleware):
+    """
+    Middleware for tracking active MCP client sessions.
+    Maintains in-memory session store for real-time client counting.
+    """
+
+    def __init__(self, session_store: SessionStore = None, idle_timeout: int = 300):
+        self.sessions = session_store or _session_store
+        if idle_timeout != 300 and session_store is None:
+            self.sessions._idle_timeout = idle_timeout
+
+    async def on_call_tool(self, context: MiddlewareContext, call_next: CallNext):
+        session_id = get_session_id()
+        user_id = None
+        try:
+            token = get_access_token()
+            user_id = token.token if token else None
+        except Exception:
+            pass
+
+        self.sessions.update(session_id, user_id)
+        return await call_next(context)
+
+    async def on_list_tools(self, context: MiddlewareContext, call_next: CallNext):
+        session_id = get_session_id()
+        self.sessions.update(session_id)
+        return await call_next(context)
+
+    def get_active_count(self) -> int:
+        """Get count of currently active sessions."""
+        return self.sessions.get_active_count()
+
+    def get_active_sessions(self) -> Dict[str, Dict]:
+        """Get all active session data."""
+        return self.sessions.get_active_sessions()
+
+
+def get_session_store() -> SessionStore:
+    """Get the global session store instance."""
+    return _session_store
