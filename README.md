@@ -11,6 +11,8 @@
 
 [![SuperMCP Introduction](https://img.youtube.com/vi/y44Pjc5p1Zg/0.jpg)](https://www.youtube.com/watch?v=y44Pjc5p1Zg)
 
+[![SuperMCP new design](https://img.youtube.com/vi/fwPdaSINrfA/0.jpg)] (https://youtu.be/fwPdaSINrfA)
+
 ## 🎯 What is SuperMCP?
 
 SuperMCP is a **powerful platform** that enables you to create **multiple isolated MCP servers** using a **single standalone connector**. This unique architecture allows you to:
