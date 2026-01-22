@@ -1,0 +1,23 @@
+[project]
+name = "databricks-connector"
+version = "1.0.0"
+description = "Multi-tenant Databricks MCP Connector with Unity Catalog support, SQL query execution, and volume management"
+requires-python = ">=3.12.2"
+dependencies = [
+    "mcp-pkg",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.24.0",
+    "databricks-sql-connector>=3.0.0",
+    "databricks-sdk>=0.20.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.11.0",
+]
+
+[project.optional-dependencies]
+all = [
+    "databricks-sql-connector[pyarrow]>=3.0.0",
+]
+
+[tool.uv.sources]
+mcp-pkg = { path = "../../mcp_pkg", editable = true }
