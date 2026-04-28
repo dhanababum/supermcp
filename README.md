@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/dhanababum-supermcp-badge.png)](https://mseep.ai/app/dhanababum-supermcp)
+
 # SuperMCP
 
 > A comprehensive platform for creating, deploying, and managing Model Context Protocol (MCP) connectors that bridge AI assistants with databases, APIs, and other data sources.
