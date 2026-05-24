@@ -1,0 +1,46 @@
+# Development Dockerfile with hot reload support
+# 
+# Build from workspace root:
+#   docker build -f connectors/openapi/Dockerfile.dev -t openapi-connector:dev .
+#
+# Or use docker-compose with proper build context
+
+FROM python:3.12.2-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gettext-base \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install uv
+
+COPY mcp_pkg /workspace/mcp_pkg
+
+RUN mkdir -p /workspace/connectors/openapi
+
+COPY connectors/openapi/pyproject.toml connectors/openapi/uv.lock* /workspace/connectors/openapi/
+
+WORKDIR /workspace/connectors/openapi
+
+RUN uv sync --frozen || uv sync
+
+COPY connectors/openapi/ /workspace/connectors/openapi/
+
+RUN chmod +x /workspace/connectors/openapi/entrypoint.sh
+
+WORKDIR /workspace/connectors/openapi
+
+ENV PATH="/workspace/connectors/openapi/.venv/bin:$PATH" \
+    PYTHONPATH="/workspace/connectors/openapi"
+
+EXPOSE 8034
+
+CMD ["sh", "entrypoint.sh"]

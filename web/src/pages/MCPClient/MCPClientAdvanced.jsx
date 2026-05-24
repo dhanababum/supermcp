@@ -143,14 +143,6 @@ const MCPClientAdvanced = () => {
         addMessage('system', 'Disconnected from previous connection');
       }
       
-      // The hook automatically connects when URL/token changes
-      // We need to trigger a reconnection by updating the URL slightly
-      const currentUrl = serverUrl;
-      setServerUrl(''); // Clear URL briefly
-      setTimeout(() => {
-        setServerUrl(currentUrl); // Set it back to trigger connection
-      }, 100);
-      
       if (needsAuth && authUrl) {
         authenticate();
       } else {
@@ -190,13 +182,6 @@ const MCPClientAdvanced = () => {
         await disconnect();
         addMessage('system', 'Disconnected for retry');
       }
-      
-      // Trigger a new connection attempt
-      const currentUrl = serverUrl;
-      setServerUrl(''); // Clear URL briefly
-      setTimeout(() => {
-        setServerUrl(currentUrl); // Set it back to trigger connection
-      }, 100);
       
       retry();
     } catch (err) {

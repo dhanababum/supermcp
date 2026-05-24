@@ -183,6 +183,14 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
     onClose();
   };
 
+  const getCreatedToolPayload = (toolData) => toolData?.tool || toolData || {};
+
+  const getRequiredParameters = (toolData) => {
+    const tool = getCreatedToolPayload(toolData);
+    const required = tool?.inputSchema?.required || [];
+    return Array.isArray(required) ? required : [];
+  };
+
   if (!connector) return null;
 
   return (
@@ -352,6 +360,28 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
                   </div>
                 </div>
 
+                {createdServer.loaded_tools && createdServer.loaded_tools.length > 0 && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 mb-3">
+                      Loaded Dynamic Tools ({createdServer.loaded_tools.length})
+                    </p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {createdServer.loaded_tools.map((toolData, index) => {
+                        const tool = getCreatedToolPayload(toolData);
+                        const required = getRequiredParameters(toolData);
+                        return (
+                          <div key={`${tool.name || 'tool'}-${index}`} className="bg-white border border-gray-200 rounded p-3">
+                            <p className="text-sm font-medium text-gray-900">{tool.name}</p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Required: {required.length > 0 ? required.join(', ') : 'None'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -413,4 +443,3 @@ const ConfigurationModal = ({ connector, onClose, onSuccess }) => {
 };
 
 export default ConfigurationModal;
-

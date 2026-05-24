@@ -356,7 +356,7 @@ async def get_servers(
     )
     servers = result.scalars().all()
     return {
-        server.id: server.configuration for server in servers}
+        str(server.id): server.configuration for server in servers}
 
 
 @router.get("/connectors/{connector_id}/servers/{server_id}")
@@ -991,14 +991,37 @@ async def create_server(
 
     token_data = await get_token(mcp_server.id)
 
+    connector_created_tools = []
     async with httpx.AsyncClient(timeout=100) as client:
-
         response = await client.post(
             f"{mcp_server.server_url}/create-server/{mcp_server.id}",
             headers={"Authorization": f"Bearer {token_data['access_token']}"},
         )
+        response.raise_for_status()
+        connector_create_response = response.json()
+        connector_created_tools = connector_create_response.get("tools", [])
         print(response)
         # print(response.json())
+
+    for tool_data in connector_created_tools:
+        template_name = tool_data.get("template_name")
+        template_args = tool_data.get("template_args")
+        tool_payload = tool_data.get("tool", tool_data)
+        tool = McpServerToolItem(**tool_payload)
+        server_tool = McpServerTool(
+            mcp_server_id=mcp_server.id,
+            user_id=current_user.id,
+            name=tool.name,
+            template_name=template_name,
+            template_args=template_args,
+            tool=tool.model_dump(),
+            tool_type=ToolType.dynamic.value,
+            is_active=True,
+        )
+        session.add(server_tool)
+
+    if connector_created_tools:
+        await session.commit()
 
     return {
         "status": "created",
@@ -1006,6 +1029,8 @@ async def create_server(
         "server_id": mcp_server.id,
         "connector_id": mcp_server.connector_id,
         "server_name": mcp_server.server_name,
+        "loaded_tools_count": len(connector_created_tools),
+        "loaded_tools": connector_created_tools,
         "token": token_value,
         "token_expires_at": token.expires_at.isoformat() if token.expires_at else None,
     }
