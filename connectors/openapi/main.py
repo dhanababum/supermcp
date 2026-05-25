@@ -186,7 +186,6 @@ async def on_server_start(server_id: str, server_config: OpenAPIConfig):
             for tool in public_tools
         ]
     }
-    print(result)
     return result
 
 
