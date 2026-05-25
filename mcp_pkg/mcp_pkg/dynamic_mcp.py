@@ -109,16 +109,24 @@ class DynamicMCP(FastMCP, TemplateMixin):
         else:
             return decorator(func)
 
-    async def _execute_create_hooks(self, server_id: str, server_data: BaseModel):
-        """Execute all registered server create hooks"""
+    async def _execute_create_hooks(
+        self, server_id: str, server_data: BaseModel, raise_errors: bool = False
+    ):
+        """Execute all registered server create hooks."""
+        results = []
         for hook in self._server_create_hooks:
             try:
                 if inspect.iscoroutinefunction(hook):
-                    await hook(server_id, server_data)
+                    result = await hook(server_id, server_data)
                 else:
-                    hook(server_id, server_data)
+                    result = hook(server_id, server_data)
+                if result is not None:
+                    results.append(result)
             except Exception as e:
                 print(f"Error in server create hook: {e}")
+                if raise_errors:
+                    raise
+        return results
 
     async def _execute_destroy_hooks(self, server_id: str):
         """Execute all registered server destroy hooks"""
@@ -139,6 +147,7 @@ async def create_mcp_servers_dictionary(app, mcp: DynamicMCP, mcp_app: Starlette
             f"{settings.connector_id}/servers",
             headers={"Authorization": f"Bearer {settings.connector_secret}"},
         )
+        response.raise_for_status()
         online_servers = response.json()
         for key, server in online_servers.items():
             app.state.mcp_servers[key] = mcp._connector_config(**server)
@@ -222,9 +231,25 @@ def create_dynamic_mcp(
 
     async def get_tools(request: Request):
         host = request.headers.get("host")
-        tools = await mcp.get_tools()
+        try:
+            if hasattr(mcp, "local_provider"):
+                tools = await mcp.local_provider.list_tools()
+                tools_list = [tool.to_mcp_tool() for tool in tools]
+            # Call parent class method explicitly to avoid MRO issues
+            elif hasattr(FastMCP, "get_tools"):
+                tools = await FastMCP.get_tools(mcp)
+                tools_list = [tool.to_mcp_tool() for _, tool in tools.items()]
+            elif hasattr(mcp, "list_tools"):
+                tools = await mcp.list_tools(run_middleware=False)
+                tools_list = [tool.to_mcp_tool() for tool in tools]
+            else:
+                # Fallback: get tools from internal storage if method not available
+                tools = getattr(mcp, '_tools', {})
+                tools_list = [tool.to_mcp_tool() for _, tool in tools.items()]
+        except TypeError:
+            tools = getattr(mcp, '_tools', {})
+            tools_list = [tool.to_mcp_tool() for _, tool in tools.items()]
         templates = mcp.list_templates()
-        tools_list = [tool.to_mcp_tool() for _, tool in tools.items()]
         config = ConnectorConfig(
             params=mcp._connector_config.model_json_schema(), ui_schema=mcp._ui_schema
         )
@@ -267,15 +292,29 @@ def create_dynamic_mcp(
             server_data = response.json()
             app.state.mcp_servers[server_id] = mcp._connector_config(**server_data)
 
-        await mcp._execute_create_hooks(server_id, app.state.mcp_servers[server_id])
+        try:
+            hook_results = await mcp._execute_create_hooks(
+                server_id, app.state.mcp_servers[server_id], raise_errors=True
+            )
+        except Exception:
+            del app.state.mcp_servers[server_id]
+            raise
 
         # Mount the MCP app, not the wrapper app!
         app.mount(
             f"/mcp/{server_id}", mcp_app, name=server_id
         )  # ← Changed: mount mcp_app
 
+        tools = []
+        for result in hook_results:
+            if isinstance(result, dict) and isinstance(result.get("tools"), list):
+                tools.extend(result["tools"])
+
         return JSONResponse(
-            {"message": f"Server {server_id} created and mounted at /mcp/{server_id}"}
+            {
+                "message": f"Server {server_id} created and mounted at /mcp/{server_id}",
+                "tools": tools,
+            }
         )
 
     async def destroy_mcp_server(request: Request):

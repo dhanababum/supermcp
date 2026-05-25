@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ServerConfigModal, ServerEditModal } from './index';
 import ServerMetricsModal from '../../Dashboard/components/ServerMetricsModal';
-import { API_BASE_URL } from '../../../services/api';
+import { ConnectorLogo } from '../../../components/common';
+import { useConnectors } from '../../../hooks';
 
 const ActionDropdown = ({ server, actions }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -60,33 +61,21 @@ const ActionDropdown = ({ server, actions }) => {
   );
 };
 
-const ServerIcon = ({ logoName, serverName }) => {
-  const [logoError, setLogoError] = useState(false);
-  const logoUrl = logoName && typeof logoName === 'string' && logoName.trim() 
-    ? `${API_BASE_URL}/api/connectors/${encodeURIComponent(logoName)}`
-    : null;
-
+const ServerIcon = ({ logoName, connectorUrl, serverName }) => {
   return (
-    <div className="flex-shrink-0 h-10 w-10 bg-white border border-surface-200 rounded-lg flex items-center justify-center overflow-hidden">
-      {logoUrl && !logoError ? (
-        <img 
-          src={logoUrl} 
-          alt={`${serverName} connector`}
-          className="w-full h-full object-contain p-1"
-          onError={() => setLogoError(true)}
-        />
-      ) : (
-        <svg className="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-        </svg>
-      )}
-    </div>
+    <ConnectorLogo
+      logoName={logoName}
+      connectorUrl={connectorUrl}
+      alt={`${serverName} connector`}
+      size="md"
+    />
   );
 };
 
 const ITEMS_PER_PAGE = 10;
 
 const ServerTable = ({ servers, onView, onDelete, onRefresh, onViewTokens }) => {
+  const { connectors } = useConnectors();
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [metricsModalOpen, setMetricsModalOpen] = useState(false);
@@ -185,7 +174,11 @@ const ServerTable = ({ servers, onView, onDelete, onRefresh, onViewTokens }) => 
             <tr key={server.id} className="hover:bg-gray-50">
               <td className="px-4 py-4">
                 <div className="flex items-center min-w-0">
-                  <ServerIcon logoName={server.connector_logo_name} serverName={server.server_name} />
+                  <ServerIcon
+                    logoName={server.connector_logo_name}
+                    connectorUrl={connectors?.find(c => String(c.id) === String(server.connector_id))?.url}
+                    serverName={server.server_name}
+                  />
                   <div className="ml-3 truncate">
                     <div className="text-sm font-medium text-gray-900 truncate">{server.server_name}</div>
                     <div className="text-xs text-gray-500 truncate">ID: {server.id}</div>

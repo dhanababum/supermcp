@@ -1,12 +1,7 @@
-import React, { useState } from 'react';
-import { API_BASE_URL } from '../../../services/api';
+import React from 'react';
+import { ConnectorLogo } from '../../../components/common';
 
 const ServerMetricsCard = ({ server, metrics, connector }) => {
-  const [logoError, setLogoError] = useState(false);
-  
-  const logoUrl = connector?.logo_name && typeof connector.logo_name === 'string' && connector.logo_name.trim() 
-    ? `${API_BASE_URL}/api/connectors/${encodeURIComponent(connector.logo_name)}`
-    : null;
   const totals = metrics?.totals || {};
   const byTool = metrics?.by_tool || [];
 
@@ -38,24 +33,17 @@ const ServerMetricsCard = ({ server, metrics, connector }) => {
               High
             </span>
           )}
-          {logoUrl && !logoError ? (
-            <div className="w-8 h-8 bg-white border border-surface-200 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-              <img 
-                src={logoUrl} 
-                alt={connector?.name || 'Connector'} 
-                className="w-full h-full object-contain p-1"
-                onError={() => setLogoError(true)}
-              />
-            </div>
-          ) : connector ? (
-            <div className="w-8 h-8 bg-surface-100 border border-surface-200 rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-              </svg>
-            </div>
-          ) : null}
+          {connector && (
+            <ConnectorLogo
+              logoName={connector.logo_name}
+              connectorUrl={connector.url}
+              alt={connector.name || 'Connector'}
+              size="sm"
+            />
+          )}
         </div>
       </div>
+
 
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-cyan-50 rounded-lg p-2.5 border border-cyan-100">

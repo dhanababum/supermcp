@@ -91,23 +91,39 @@ class CustomToolMiddleware(Middleware):
         )
         fastmcp_context = context.fastmcp_context.fastmcp
         if app_server_tool and app_server_tool.tool_type == ToolType.dynamic:
-            is_async = fastmcp_context.get_template(
-                app_server_tool.template_name
-            ).is_async
-            if is_async:
-                result = await fastmcp_context.render_template_async(
-                    name=app_server_tool.template_name,
-                    raw_params=app_server_tool.template_args,
-                    extra_kwargs=context.message.arguments,
+            if app_server_tool.template_name:
+                is_async = fastmcp_context.get_template(
+                    app_server_tool.template_name
+                ).is_async
+                if is_async:
+                    result = await fastmcp_context.render_template_async(
+                        name=app_server_tool.template_name,
+                        raw_params=app_server_tool.template_args,
+                        extra_kwargs=context.message.arguments,
+                    )
+                else:
+                    result = fastmcp_context.render_template(
+                        name=app_server_tool.template_name,
+                        raw_params=app_server_tool.template_args,
+                        extra_kwargs=context.message.arguments,
+                    )
+                result = ToolResult(content=[TextContent(type="text", text=result)])
+                return result
+
+            runtime_tool_name = (app_server_tool.template_args or {}).get(
+                "runtime_tool_name"
+            )
+            if runtime_tool_name:
+                runtime_context = context.copy(
+                    message=context.message.model_copy(
+                        update={"name": runtime_tool_name}
+                    )
                 )
-            else:
-                result = fastmcp_context.render_template(
-                    name=app_server_tool.template_name,
-                    raw_params=app_server_tool.template_args,
-                    extra_kwargs=context.message.arguments,
-                )
-            result = ToolResult(content=[TextContent(type="text", text=result)])
-            return result
+                return await call_next(runtime_context)
+
+            raise ToolError(
+                f"Dynamic tool {context.message.name} has no template or runtime target"
+            )
         elif not app_server_tool:
             raise ToolError(f"Access denied to private tool: {context.message.name}")
         tool: MCPTool = await call_next(context)

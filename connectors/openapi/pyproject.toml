@@ -1,0 +1,16 @@
+[project]
+name = "openapi-connector"
+version = "1.0.0"
+description = "OpenAPI/Swagger MCP Connector for converting specs into MCP tool metadata"
+requires-python = ">=3.12.2"
+dependencies = [
+    "mcp-pkg",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.24.0",
+    "fastapi>=0.115.0",
+    "httpx>=0.24.0",
+    "pyyaml>=6.0.0",
+]
+
+[tool.uv.sources]
+mcp-pkg = { path = "../../mcp_pkg", editable = true }
