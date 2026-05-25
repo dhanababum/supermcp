@@ -59,6 +59,12 @@ ui_schema = {
         "ui:placeholder": "X-API-Key",
         "ui:help": "Header name for API key or custom header auth",
     },
+    "custom_headers": {
+        "ui:widget": "textarea",
+        "ui:options": {"rows": 4},
+        "ui:placeholder": '{\n  "X-Custom-Header": "value"\n}',
+        "ui:help": "Additional custom headers as a JSON dictionary (key-value)",
+    },
 }
 
 mcp.register_ui_schema(ui_schema)
@@ -163,11 +169,17 @@ async def on_server_start(server_id: str, server_config: OpenAPIConfig):
     )
 
     await _close_openapi_client(server_id)
+    
+    headers = _auth_headers(server_config)
+    if server_config.custom_headers:
+        for k, v in server_config.custom_headers.items():
+            headers[str(k)] = str(v)
+
     client = _create_openapi_client(
         openapi_spec,
         server_config.timeout,
         server_config.spec_url,
-        _auth_headers(server_config),
+        headers,
     )
     provider = OpenAPIProvider(openapi_spec=openapi_spec, client=client)
     namespace = _runtime_namespace(server_id)

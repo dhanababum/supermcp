@@ -172,7 +172,10 @@ const ServerTable = ({ servers, onView, onDelete, onRefresh, onViewTokens }) => 
         <tbody className="bg-white divide-y divide-gray-200">
           {paginatedServers.map((server) => (
             <tr key={server.id} className="hover:bg-gray-50">
-              <td className="px-4 py-4">
+              <td 
+                className="px-4 py-4 cursor-pointer hover:bg-gray-100/50 group"
+                onClick={() => onView(server)}
+              >
                 <div className="flex items-center min-w-0">
                   <ServerIcon
                     logoName={server.connector_logo_name}
@@ -180,7 +183,7 @@ const ServerTable = ({ servers, onView, onDelete, onRefresh, onViewTokens }) => 
                     serverName={server.server_name}
                   />
                   <div className="ml-3 truncate">
-                    <div className="text-sm font-medium text-gray-900 truncate">{server.server_name}</div>
+                    <div className="text-sm font-medium text-gray-900 truncate group-hover:text-brand-600 group-hover:underline">{server.server_name}</div>
                     <div className="text-xs text-gray-500 truncate">ID: {server.id}</div>
                   </div>
                 </div>

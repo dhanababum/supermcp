@@ -955,85 +955,120 @@ async def create_server(
     connector = await check_connector_access(
         session, current_user, connector_id)
     server_data["server_url"] = connector.url
-    mcp_server = McpServer(
-        **server_data, connector_id=connector_id, user_id=current_user.id
-    )
-    session.add(mcp_server)
-    await session.commit()
-    await session.refresh(mcp_server)
-
-    tools_list = connector.tools_config
-
-    for tool in tools_list:
-        tool = McpServerToolItem(**tool)
-        server_tool = McpServerTool(
-            mcp_server_id=mcp_server.id,
-            user_id=current_user.id,
-            name=tool.name,
-            tool=tool.model_dump(),
-            tool_type=ToolType.static.value,
-            is_active=True,
+    
+    mcp_server = None
+    try:
+        mcp_server = McpServer(
+            **server_data, connector_id=connector_id, user_id=current_user.id
         )
-        session.add(server_tool)
-
-    await session.commit()
-    # Generate a secure token
-    token_value = f"mcp_token_{secrets.token_urlsafe(32)}"
-    token = McpServerToken(
-        token=token_value,
-        mcp_server_id=mcp_server.id,
-        user_id=current_user.id,
-        expires_at=token_expires_at,
-    )
-    session.add(token)
-    await session.commit()
-    await session.refresh(token)
-
-    token_data = await get_token(mcp_server.id)
-
-    connector_created_tools = []
-    async with httpx.AsyncClient(timeout=100) as client:
-        response = await client.post(
-            f"{mcp_server.server_url}/create-server/{mcp_server.id}",
-            headers={"Authorization": f"Bearer {token_data['access_token']}"},
-        )
-        response.raise_for_status()
-        connector_create_response = response.json()
-        connector_created_tools = connector_create_response.get("tools", [])
-        print(response)
-        # print(response.json())
-
-    for tool_data in connector_created_tools:
-        template_name = tool_data.get("template_name")
-        template_args = tool_data.get("template_args")
-        tool_payload = tool_data.get("tool", tool_data)
-        tool = McpServerToolItem(**tool_payload)
-        server_tool = McpServerTool(
-            mcp_server_id=mcp_server.id,
-            user_id=current_user.id,
-            name=tool.name,
-            template_name=template_name,
-            template_args=template_args,
-            tool=tool.model_dump(),
-            tool_type=ToolType.dynamic.value,
-            is_active=True,
-        )
-        session.add(server_tool)
-
-    if connector_created_tools:
+        session.add(mcp_server)
         await session.commit()
+        await session.refresh(mcp_server)
+    
+        tools_list = connector.tools_config
+    
+        for tool in tools_list:
+            tool = McpServerToolItem(**tool)
+            server_tool = McpServerTool(
+                mcp_server_id=mcp_server.id,
+                user_id=current_user.id,
+                name=tool.name,
+                tool=tool.model_dump(),
+                tool_type=ToolType.static.value,
+                is_active=True,
+            )
+            session.add(server_tool)
+    
+        await session.commit()
+        
+        # Generate a secure token
+        token_value = f"mcp_token_{secrets.token_urlsafe(32)}"
+        token = McpServerToken(
+            token=token_value,
+            mcp_server_id=mcp_server.id,
+            user_id=current_user.id,
+            expires_at=token_expires_at,
+        )
+        session.add(token)
+        await session.commit()
+        await session.refresh(token)
+    
+        token_data = await get_token(mcp_server.id)
+    
+        connector_created_tools = []
+        async with httpx.AsyncClient(timeout=100) as client:
+            response = await client.post(
+                f"{mcp_server.server_url}/create-server/{mcp_server.id}",
+                headers={"Authorization": f"Bearer {token_data['access_token']}"},
+            )
+            response.raise_for_status()
+            connector_create_response = response.json()
+            connector_created_tools = connector_create_response.get("tools", [])
+            print(response)
+    
+        for tool_data in connector_created_tools:
+            template_name = tool_data.get("template_name")
+            template_args = tool_data.get("template_args")
+            tool_payload = tool_data.get("tool", tool_data)
+            tool = McpServerToolItem(**tool_payload)
+            server_tool = McpServerTool(
+                mcp_server_id=mcp_server.id,
+                user_id=current_user.id,
+                name=tool.name,
+                template_name=template_name,
+                template_args=template_args,
+                tool=tool.model_dump(),
+                tool_type=ToolType.dynamic.value,
+                is_active=True,
+            )
+            session.add(server_tool)
+    
+        if connector_created_tools:
+            await session.commit()
+    
+        return {
+            "status": "created",
+            "message": f"Server '{mcp_server.server_name}' created successfully",
+            "server_id": mcp_server.id,
+            "connector_id": mcp_server.connector_id,
+            "server_name": mcp_server.server_name,
+            "loaded_tools_count": len(connector_created_tools),
+            "loaded_tools": connector_created_tools,
+            "token": token_value,
+            "token_expires_at": token.expires_at.isoformat() if token.expires_at else None,
+        }
+    except Exception as e:
+        # Perform rollback of current session transaction
+        try:
+            await session.rollback()
+        except Exception:
+            pass
 
-    return {
-        "status": "created",
-        "message": f"Server '{mcp_server.server_name}' created successfully",
-        "server_id": mcp_server.id,
-        "connector_id": mcp_server.connector_id,
-        "server_name": mcp_server.server_name,
-        "loaded_tools_count": len(connector_created_tools),
-        "loaded_tools": connector_created_tools,
-        "token": token_value,
-        "token_expires_at": token.expires_at.isoformat() if token.expires_at else None,
-    }
+        # Cleanup server if created and committed
+        if mcp_server and getattr(mcp_server, 'id', None):
+            try:
+                from sqlalchemy import text
+                await session.execute(
+                    text("DELETE FROM mcp_servers WHERE id = :server_id"),
+                    {"server_id": mcp_server.id}
+                )
+                await session.commit()
+            except Exception as cleanup_err:
+                print(f"Failed to cleanup server {mcp_server.id} from database: {cleanup_err}")
+
+        # Return descriptive HTTP exceptions for client
+        if isinstance(e, httpx.HTTPStatusError):
+            try:
+                err_detail = e.response.json().get("detail", str(e))
+            except Exception:
+                err_detail = str(e)
+            raise HTTPException(status_code=e.response.status_code, detail=f"Connector Validation Error: {err_detail}")
+        elif isinstance(e, httpx.RequestError):
+            raise HTTPException(status_code=503, detail=f"Failed to connect to the connector server: {str(e)}")
+        elif isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 
 @router.get("/servers")
