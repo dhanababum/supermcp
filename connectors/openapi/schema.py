@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -37,6 +37,10 @@ class OpenAPIConfig(BaseModel):
         default=None,
         description="Header name for api_key or custom_header authentication"
     )
+    custom_headers: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom headers (key-value dictionary)"
+    )
 
     @model_validator(mode="after")
     def validate_config(self):
@@ -50,4 +54,10 @@ class OpenAPIConfig(BaseModel):
             raise ValueError(
                 "auth_header_name is required when auth_type is custom_header"
             )
+        if self.custom_headers:
+            for k, v in self.custom_headers.items():
+                if not isinstance(k, (str, int, float)) or not isinstance(v, (str, int, float, bool)):
+                    raise ValueError("custom_headers keys and values must be simple types")
         return self
+
+

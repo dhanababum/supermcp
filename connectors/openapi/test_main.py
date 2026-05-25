@@ -139,3 +139,60 @@ paths:
         from main import on_server_stop
 
         await on_server_stop("abc-def")
+
+
+def test_custom_headers_validation():
+    # Valid dict
+    config = OpenAPIConfig(
+        spec_raw="openapi: 3.0.0\ninfo:\n  title: test\n  version: 1\npaths: {}",
+        custom_headers={"X-My-Header": "value1", "X-Header2": 123}
+    )
+    assert config.custom_headers == {"X-My-Header": "value1", "X-Header2": 123}
+
+    # Valid dict but contains complex types
+    with pytest.raises(ValueError, match="keys and values must be simple types"):
+        OpenAPIConfig(
+            spec_raw="openapi: 3.0.0\ninfo:\n  title: test\n  version: 1\npaths: {}",
+            custom_headers={"nested": {"key": "val"}}
+        )
+
+
+@pytest.mark.anyio
+async def test_server_create_merges_custom_headers():
+    config = OpenAPIConfig(
+        spec_raw="""
+openapi: 3.0.0
+info:
+  title: Simple API
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+paths:
+  /hello:
+    get:
+      operationId: sayHello
+      responses:
+        '200':
+          description: ok
+""",
+        auth_type=AuthType.api_key,
+        auth_token="api-secret-key",
+        auth_header_name="X-Auth-Key",
+        custom_headers={"X-Custom-Header": "custom-val", "X-Second-Header": "second-val"}
+    )
+
+    result = await on_server_start("custom-headers-test", config)
+    try:
+        from main import openapi_clients
+        client = openapi_clients["custom-headers-test"]
+        
+        # Verify both auth headers and custom headers are set on the HTTP client
+        headers = client.headers
+        assert headers.get("X-Auth-Key") == "api-secret-key"
+        assert headers.get("X-Custom-Header") == "custom-val"
+        assert headers.get("X-Second-Header") == "second-val"
+    finally:
+        from main import on_server_stop
+        await on_server_stop("custom-headers-test")
+
+
